@@ -4,10 +4,12 @@ import datetime
 from typing import Dict, Any, List, Optional
 
 # Import other Agents from current location, change package location if moved
+from .BaseAgent import BaseAgent
 from .AuditingAgent import AgentAuditing, AuditLevel
 
-class RuleDocumentationAgent:
-    def __init__(self, llm_client: Any, audit_system: AgentAuditing, agent_id: str = None):
+class RuleDocumentationAgent(BaseAgent):
+    def __init__(self, llm_client: Any, audit_system: AgentAuditing, agent_id: str = None, 
+                 log_level: int = 0, model_name: str = "gemini-1.5-flash", llm_provider: str = "google"):
         """
         Initializes the RuleDocumentationAgent.
 
@@ -15,12 +17,22 @@ class RuleDocumentationAgent:
             llm_client: An initialized LLM client (e.g., OpenAI, LangChain).
             audit_system: An instance of the AgentAuditing class.
             agent_id: Unique identifier for this agent instance.
+            log_level: 0 for production (silent), 1 for development (verbose)
+            model_name: Name of the LLM model being used
+            llm_provider: Name of the LLM provider
         """
+        # Initialize base agent
+        super().__init__(
+            audit_system=audit_system,
+            agent_id=agent_id,
+            log_level=log_level,
+            model_name=model_name,
+            llm_provider=llm_provider,
+            agent_name="Rule Documentation and Visualization Agent"
+        )
+        
+        # Documentation-specific configuration
         self.llm_client = llm_client
-        self.audit_system = audit_system
-        self.agent_id = agent_id if agent_id else f"RuleDocAgent-{uuid.uuid4().hex[:8]}"
-        self.agent_name = "Rule Documentation and Visualization Agent"
-        self.version = "1.0.0"
 
     def _prepare_llm_prompt_for_documentation(self, rules: List[Dict]) -> tuple[str, str]:
         """
@@ -392,4 +404,36 @@ class RuleDocumentationAgent:
         return {
             "generated_documentation": generated_documentation,
             "audit_log": audit_log_data
+        }
+    
+    def get_agent_info(self) -> Dict[str, Any]:
+        """
+        Get agent information including capabilities and configuration.
+        
+        Returns:
+            Dictionary containing agent information
+        """
+        return {
+            "agent_name": self.agent_name,
+            "agent_id": self.agent_id,
+            "version": self.version,
+            "model_name": self.model_name,
+            "llm_provider": self.llm_provider,
+            "capabilities": [
+                "rule_documentation",
+                "business_domain_classification", 
+                "multi_format_output",
+                "visualization_generation",
+                "contextual_summarization"
+            ],
+            "supported_formats": ["markdown", "json", "html"],
+            "supported_domains": [
+                "insurance", "trading", "lending", "banking", 
+                "healthcare", "ecommerce", "general"
+            ],
+            "configuration": {
+                "api_timeout_seconds": self.API_TIMEOUT_SECONDS,
+                "max_retries": self.MAX_RETRIES,
+                "default_format": "markdown"
+            }
         }

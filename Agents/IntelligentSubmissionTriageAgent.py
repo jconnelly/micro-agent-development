@@ -1,22 +1,14 @@
 import json
-import uuid
 import datetime
 import time
-import asyncio
-import socket
 from typing import Dict, Any, Optional, List
 
 # Import other Agents from current location, change package location if moved
+from .BaseAgent import BaseAgent
 from .AuditingAgent import AgentAuditing, AuditLevel
-from .LoggerAgent import AgentLogger
 from .PIIScrubbingAgent import PIIScrubbingAgent, PIIContext, MaskingStrategy
 
-class IntelligentSubmissionTriageAgent:
-    # Rate limiting and timeout constants
-    API_DELAY_SECONDS = 1.0
-    MAX_RETRIES = 3
-    API_TIMEOUT_SECONDS = 30
-    TOTAL_OPERATION_TIMEOUT = 300  # 5 minutes
+class IntelligentSubmissionTriageAgent(BaseAgent):
     
     def __init__(self, llm_client: Any, audit_system: AgentAuditing, agent_id: str = None,
                  log_level: int = 0, model_name: str = "unknown", llm_provider: str = "unknown",
@@ -34,14 +26,18 @@ class IntelligentSubmissionTriageAgent:
             enable_pii_scrubbing: Whether to enable PII scrubbing before sending to LLM
             pii_masking_strategy: Strategy for masking detected PII
         """
+        # Initialize base agent
+        super().__init__(
+            audit_system=audit_system,
+            agent_id=agent_id,
+            log_level=log_level,
+            model_name=model_name,
+            llm_provider=llm_provider,
+            agent_name="Intelligent Submission Triage Agent"
+        )
+        
+        # Triage-specific configuration
         self.llm_client = llm_client
-        self.audit_system = audit_system
-        self.agent_id = agent_id if agent_id else f"TriageAgent-{uuid.uuid4().hex[:8]}"
-        self.logger = AgentLogger(log_level=log_level, agent_name="SubmissionTriage")
-        self.model_name = model_name
-        self.llm_provider = llm_provider
-        self.agent_name = "Intelligent Submission Triage Agent"
-        self.version = "1.0.0"
         self.tools_available = ["document_parser", "rule_engine_checker"] # Example tools the agent might use
         
         # Initialize PII scrubbing agent if enabled
@@ -58,95 +54,18 @@ class IntelligentSubmissionTriageAgent:
             self.pii_scrubber = None
             self.pii_masking_strategy = None
 
-    def get_ip_address(self):
-        """Get the current machine's IP address."""
-        try:
-            hostname = socket.gethostname()
-            return socket.gethostbyname(hostname)
-        except Exception:
-            self.logger.warning("Could not resolve hostname to IP address.")
-            return "127.0.0.1"
+    # get_ip_address() method now inherited from BaseAgent
     
-    def _log_exception_to_audit(self, request_id: str, exception: Exception, error_type: str, context: dict):
-        """
-        Log exception details to the audit system with processing context.
-        
-        Args:
-            request_id: The request ID for tracking
-            exception: The exception that occurred
-            error_type: Type of error for categorization
-            context: Additional context about the processing state
-        """
-        try:
-            # Create audit summary with logger session data
-            audit_summary = self.logger.create_audit_summary(
-                operation_name="triage_exception",
-                request_id=request_id,
-                status="FAILED",
-                error_type=error_type,
-                exception_message=str(exception),
-                exception_type=type(exception).__name__,
-                processing_context=context
-            )
-            
-            # Log to audit system if available
-            if self.audit_system:
-                self.audit_system.log_agent_activity(
-                    request_id=request_id,
-                    user_id="system",
-                    session_id=request_id,
-                    ip_address=self.get_ip_address(),
-                    agent_id=self.agent_id,
-                    agent_name=self.agent_name,
-                    agent_version=self.version,
-                    step_type="EXCEPTION_HANDLING",
-                    llm_model_name=self.model_name,
-                    llm_provider=self.llm_provider,
-                    llm_input={"error_type": error_type},
-                    llm_output=audit_summary,
-                    tokens_input=0,
-                    tokens_output=0,
-                    duration_ms=0,
-                    success=False,
-                    error_message=str(exception),
-                    audit_level=1  # Always log exceptions
-                )
-        except Exception as audit_error:
-            # Don't let audit logging failures break the main process
-            self.logger.error(f"Failed to log exception to audit trail: {audit_error}", request_id=request_id)
+    # _log_exception_to_audit() method now inherited from BaseAgent
 
     def _api_call_with_retry(self, submission_data: Dict[str, Any], request_id: str):
         """
-        Make API call with retry logic, exponential backoff, and timeout handling using asyncio.
+        Make API call with retry logic using base class functionality.
         """
-        return asyncio.run(self._api_call_with_retry_async(submission_data, request_id))
-    
-    async def _api_call_with_retry_async(self, submission_data: Dict[str, Any], request_id: str):
-        """
-        Async API call with retry logic and timeout handling.
-        """
-        for attempt in range(self.MAX_RETRIES):
-            try:
-                # Use asyncio.wait_for for timeout handling
-                response = await asyncio.wait_for(
-                    self._make_api_call_async(submission_data, request_id),
-                    timeout=self.API_TIMEOUT_SECONDS
-                )
-                return response
-                
-            except asyncio.TimeoutError:
-                self.logger.warning(f"API call timed out after {self.API_TIMEOUT_SECONDS} seconds")
-                if attempt == self.MAX_RETRIES - 1:
-                    raise TimeoutError(f"API call failed after {self.MAX_RETRIES} attempts due to timeouts")
-                    
-            except Exception as e:
-                if attempt == self.MAX_RETRIES - 1:
-                    raise e
-                
-            # Exponential backoff: wait 2^attempt seconds
-            wait_time = 2 ** attempt
-            self.logger.warning(f"API call failed (attempt {attempt + 1}/{self.MAX_RETRIES}), retrying in {wait_time}s")
-            await asyncio.sleep(wait_time)
+        return super()._api_call_with_retry(
+            self._make_api_call_async, submission_data, request_id
+        )
+    # _api_call_with_retry_async() method now inherited from BaseAgent
     
     async def _make_api_call_async(self, submission_data: Dict[str, Any], request_id: str):
         """
@@ -328,7 +247,7 @@ class IntelligentSubmissionTriageAgent:
             "raw_response": llm_response[:500] if llm_response else "None",
             "tokens_processed": tokens_input + tokens_output,
             "submission_id": submission_data.get('id', 'N/A')
-        })
+        }, "triage")
     
     def _handle_user_interruption(self, error: KeyboardInterrupt, submission_data: Dict[str, Any], request_id: str) -> None:
         """
@@ -339,7 +258,7 @@ class IntelligentSubmissionTriageAgent:
         self._log_exception_to_audit(request_id, error, "USER_INTERRUPTION", {
             "submission_id": submission_data.get('id', 'N/A'),
             "processing_stage": "triage"
-        })
+        }, "triage")
     
     def _handle_timeout_error(self, error: TimeoutError, tokens_input: int, tokens_output: int, submission_data: Dict[str, Any], request_id: str) -> None:
         """
@@ -351,7 +270,7 @@ class IntelligentSubmissionTriageAgent:
             "timeout_duration": self.API_TIMEOUT_SECONDS,
             "tokens_processed": tokens_input + tokens_output,
             "submission_id": submission_data.get('id', 'N/A')
-        })
+        }, "triage")
     
     def _handle_unexpected_error(self, error: Exception, tokens_input: int, tokens_output: int, submission_data: Dict[str, Any], request_id: str) -> None:
         """
@@ -364,7 +283,7 @@ class IntelligentSubmissionTriageAgent:
             "tokens_processed": tokens_input + tokens_output,
             "submission_id": submission_data.get('id', 'N/A'),
             "processing_stage": "triage"
-        })
+        }, "triage")
     
     def _create_final_audit_entry(self, request_id: str, user_id: str, session_id: str, scrubbed_data: Dict[str, Any], 
                                   triage_decision: Dict[str, Any], llm_response: str, tokens_input: int, tokens_output: int, 
@@ -485,3 +404,32 @@ class IntelligentSubmissionTriageAgent:
         
         # 6. Prepare and return final result
         return self._prepare_final_result(triage_decision, audit_log_data, pii_scrubbing_result)
+    
+    def get_agent_info(self) -> Dict[str, Any]:
+        """
+        Get agent information including capabilities and configuration.
+        
+        Returns:
+            Dictionary containing agent information
+        """
+        return {
+            "agent_name": self.agent_name,
+            "agent_id": self.agent_id,
+            "version": self.version,
+            "model_name": self.model_name,
+            "llm_provider": self.llm_provider,
+            "capabilities": [
+                "submission_triage",
+                "risk_assessment",
+                "pii_protection",
+                "automated_decision_making"
+            ],
+            "tools_available": self.tools_available,
+            "pii_scrubbing_enabled": self.enable_pii_scrubbing,
+            "pii_masking_strategy": self.pii_masking_strategy.value if self.pii_masking_strategy else None,
+            "configuration": {
+                "api_timeout_seconds": self.API_TIMEOUT_SECONDS,
+                "max_retries": self.MAX_RETRIES,
+                "api_delay_seconds": self.API_DELAY_SECONDS
+            }
+        }

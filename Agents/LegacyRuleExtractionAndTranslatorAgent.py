@@ -3,20 +3,19 @@
 import json
 import uuid
 import datetime
-import socket
 import time
 import asyncio
 from typing import Dict, Any, List, Optional
 
 # Import other Agents from current location, change package location if moved
+from .BaseAgent import BaseAgent
 from .AuditingAgent import AgentAuditing, AuditLevel
-from .LoggerAgent import AgentLogger
 
 # Import the Google Generative AI library
 import google.generativeai as genai
 from google.generativeai import types # For GenerateContentConfig and other types
 
-class LegacyRuleExtractionAgent:
+class LegacyRuleExtractionAgent(BaseAgent):
     # Rate limiting constants
     API_DELAY_SECONDS = 1.0
     MAX_RETRIES = 3
@@ -38,24 +37,20 @@ class LegacyRuleExtractionAgent:
             model_name: Name of the LLM model being used (e.g., "gemini-1.5-flash", "gpt-4")
             llm_provider: Provider of the LLM (e.g., "google", "openai", "anthropic")
         """
+        # Initialize base agent
+        super().__init__(
+            audit_system=audit_system,
+            agent_id=agent_id,
+            log_level=log_level,
+            model_name=model_name,
+            llm_provider=llm_provider,
+            agent_name="Legacy Rule Extraction and Translator Agent"
+        )
+        
+        # Rule extraction specific configuration
         self.llm_client = llm_client
-        self.audit_system = audit_system
-        self.agent_id = agent_id if agent_id else f"RuleExtractorAgent-{uuid.uuid4().hex[:8]}"
-        self.logger = AgentLogger(log_level=log_level, agent_name="LegacyRuleExtractor")
-        self.model_name = model_name
-        self.llm_provider = llm_provider
-        self.agent_name = "Legacy Rule Extraction and Translator Agent"
-        self.version = "1.0.0"
 
-    # Get IP Address to use for audit trail
-    def get_ip_address(self) -> str:
-        ip_address = ""
-        try:
-            hostname = socket.gethostname()
-            ip_address = socket.gethostbyname(hostname)
-        except socket.gaierror:
-            self.logger.warning("Could not resolve hostname to IP address.")
-        return ip_address
+    # get_ip_address() method now inherited from BaseAgent
 
     def _prepare_llm_prompt(self, code_snippet: str, context: Optional[str] = None) -> tuple[str, str]:
         """
@@ -142,86 +137,17 @@ class LegacyRuleExtractionAgent:
         
         return target_pos  # Fall back to original position
     
-    def _log_exception_to_audit(self, request_id: str, exception: Exception, error_type: str, context: dict):
-        """
-        Log exception details to the audit system with processing context.
-        
-        Args:
-            request_id: The request ID for tracking
-            exception: The exception that occurred
-            error_type: Type of error for categorization
-            context: Additional context about the processing state
-        """
-        try:
-            # Create audit summary with logger session data
-            audit_summary = self.logger.create_audit_summary(
-                operation_name="rule_extraction_exception",
-                request_id=request_id,
-                status="FAILED",
-                error_type=error_type,
-                exception_message=str(exception),
-                exception_type=type(exception).__name__,
-                processing_context=context
-            )
-            
-            # Log to audit system if available
-            if self.audit_system:
-                self.audit_system.log_agent_activity(
-                    request_id=request_id,
-                    user_id="system",
-                    session_id=request_id,
-                    ip_address=self.get_ip_address(),
-                    agent_id=self.agent_id,
-                    agent_name=self.agent_name,
-                    agent_version=self.version,
-                    step_type="EXCEPTION_HANDLING",
-                    llm_model_name=self.model_name,
-                    llm_provider=self.llm_provider,
-                    llm_input={"error_type": error_type},
-                    llm_output=audit_summary,
-                    tokens_input=0,
-                    tokens_output=0,
-                    duration_ms=0,
-                    success=False,
-                    error_message=str(exception),
-                    audit_level=1  # Always log exceptions
-                )
-        except Exception as audit_error:
-            # Don't let audit logging failures break the main process
-            self.logger.error(f"Failed to log exception to audit trail: {audit_error}", request_id=request_id)
+    # _log_exception_to_audit() method now inherited from BaseAgent
     
     def _api_call_with_retry(self, prompt: str):
         """
-        Make API call with retry logic, exponential backoff, and timeout handling using asyncio.
+        Make API call with retry logic using base class functionality.
         """
-        return asyncio.run(self._api_call_with_retry_async(prompt))
+        return super()._api_call_with_retry(
+            self._make_api_call_async, prompt
+        )
     
-    async def _api_call_with_retry_async(self, prompt: str):
-        """
-        Async API call with retry logic and timeout handling.
-        """
-        for attempt in range(self.MAX_RETRIES):
-            try:
-                # Use asyncio.wait_for for timeout handling
-                response = await asyncio.wait_for(
-                    self._make_api_call_async(prompt),
-                    timeout=self.API_TIMEOUT_SECONDS
-                )
-                return response
-                
-            except asyncio.TimeoutError:
-                self.logger.warning(f"API call timed out after {self.API_TIMEOUT_SECONDS} seconds")
-                if attempt == self.MAX_RETRIES - 1:
-                    raise TimeoutError(f"API call failed after {self.MAX_RETRIES} attempts due to timeouts")
-                    
-            except Exception as e:
-                if attempt == self.MAX_RETRIES - 1:
-                    raise e
-                
-            # Exponential backoff: wait 2^attempt seconds
-            wait_time = 2 ** attempt
-            self.logger.warning(f"API call failed (attempt {attempt + 1}/{self.MAX_RETRIES}), retrying in {wait_time}s")
-            await asyncio.sleep(wait_time)
+    # _api_call_with_retry_async() method now inherited from BaseAgent
     
     async def _make_api_call_async(self, prompt: str):
         """
@@ -578,14 +504,14 @@ class LegacyRuleExtractionAgent:
                 "raw_response": llm_response_raw[:500] if llm_response_raw else "None",
                 "tokens_processed": tokens_input + tokens_output,
                 "rules_extracted_before_error": len(extracted_rules)
-            })
+            }, "rule_extraction")
         except KeyboardInterrupt as e:
             error_details = f"Processing interrupted by user"
             self.logger.warning(error_details, request_id=request_id)
             self._log_exception_to_audit(request_id, e, "USER_INTERRUPTION", {
                 "rules_extracted_before_interruption": len(extracted_rules),
                 "processing_stage": "rule_extraction"
-            })
+            }, "rule_extraction")
         except TimeoutError as e:
             error_details = f"Operation timed out: {e}"
             self.logger.error(error_details, request_id=request_id, exception=e)
@@ -593,7 +519,7 @@ class LegacyRuleExtractionAgent:
                 "timeout_duration": self.TOTAL_OPERATION_TIMEOUT,
                 "tokens_processed": tokens_input + tokens_output,
                 "rules_extracted_before_timeout": len(extracted_rules)
-            })
+            }, "rule_extraction")
         except Exception as e:
             error_details = f"Unexpected error during rule extraction: {e}"
             self.logger.error(error_details, request_id=request_id, exception=e)
@@ -602,7 +528,7 @@ class LegacyRuleExtractionAgent:
                 "tokens_processed": tokens_input + tokens_output,
                 "rules_extracted_before_error": len(extracted_rules),
                 "processing_stage": "rule_extraction"
-            })
+            }, "rule_extraction")
 
         end_time = datetime.datetime.now(datetime.timezone.utc)
         duration_ms = (end_time - start_time).total_seconds() * 1000
@@ -648,4 +574,38 @@ class LegacyRuleExtractionAgent:
         return {
             "extracted_rules": extracted_rules,
             "audit_log": audit_log_data
+        }
+    
+    def get_agent_info(self) -> Dict[str, Any]:
+        """
+        Get agent information including capabilities and configuration.
+        
+        Returns:
+            Dictionary containing agent information
+        """
+        return {
+            "agent_name": self.agent_name,
+            "agent_id": self.agent_id,
+            "version": self.version,
+            "model_name": self.model_name,
+            "llm_provider": self.llm_provider,
+            "capabilities": [
+                "legacy_code_analysis",
+                "business_rule_extraction",
+                "code_translation",
+                "large_file_processing",
+                "chunked_processing"
+            ],
+            "supported_languages": [
+                "Java", "C++", "COBOL", "CLIPS", "Drools", 
+                "XML", "JSON", "Legacy Business Rules"
+            ],
+            "configuration": {
+                "api_timeout_seconds": self.API_TIMEOUT_SECONDS,
+                "max_retries": self.MAX_RETRIES,
+                "api_delay_seconds": self.API_DELAY_SECONDS,
+                "total_operation_timeout": self.TOTAL_OPERATION_TIMEOUT,
+                "chunk_size_lines": 175,
+                "overlap_size_lines": 25
+            }
         }

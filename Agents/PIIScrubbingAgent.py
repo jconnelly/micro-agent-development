@@ -30,8 +30,19 @@ import secrets
 import string
 
 # Import other Agents from current location, change package location if moved
-from .LoggerAgent import AgentLogger
+from .BaseAgent import BaseAgent
 from .AuditingAgent import AgentAuditing
+
+# Import Utils - handle both relative and absolute imports
+try:
+    from ..Utils import JsonUtils, TextProcessingUtils
+except ImportError:
+    import sys
+    import os
+    parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if parent_dir not in sys.path:
+        sys.path.insert(0, parent_dir)
+    from Utils import JsonUtils, TextProcessingUtils
 
 
 class PIIType(Enum):
@@ -66,7 +77,7 @@ class PIIContext(Enum):
     GOVERNMENT = "government"
 
 
-class PIIScrubbingAgent:
+class PIIScrubbingAgent(BaseAgent):
     """
     Production-ready agent for PII detection and scrubbing with comprehensive audit trail.
     
@@ -91,17 +102,19 @@ class PIIScrubbingAgent:
             log_level: 0 for production (silent), 1 for development (verbose)
             enable_tokenization: Whether to support reversible tokenization
         """
-        self.agent_id = agent_id or f"PIIScrubber-{uuid.uuid4().hex[:8]}"
-        self.audit_system = audit_system
-        self.context = context
-        self.version = "1.0.0"
-        self.enable_tokenization = enable_tokenization
-        
-        # Initialize logger
-        self.logger = AgentLogger(
+        # Initialize base agent
+        super().__init__(
+            audit_system=audit_system,
+            agent_id=agent_id,
             log_level=log_level,
+            model_name="pii-scrubber",
+            llm_provider="internal",
             agent_name="PII Scrubbing Agent"
         )
+        
+        # PII-specific configuration
+        self.context = context
+        self.enable_tokenization = enable_tokenization
         
         # Token storage for reversible operations (in production, this would be encrypted/external storage)
         self.token_mapping: Dict[str, str] = {}
@@ -178,14 +191,7 @@ class PIIScrubbingAgent:
         Returns:
             Tuple of (text_data, is_dict_input)
         """
-        if isinstance(data, dict):
-            text_data = json.dumps(data, indent=2)
-            is_dict_input = True
-        else:
-            text_data = str(data)
-            is_dict_input = False
-        
-        return text_data, is_dict_input
+        return TextProcessingUtils.prepare_input_data(data)
     
     def _perform_pii_detection(self, text_data: str, request_id: str) -> tuple[List[PIIType], Dict[PIIType, List]]:
         """
@@ -234,14 +240,11 @@ class PIIScrubbingAgent:
         Returns:
             Scrubbed data in appropriate format
         """
-        if is_dict_input:
-            try:
-                return json.loads(scrubbed_text)
-            except json.JSONDecodeError:
-                # If JSON parsing fails, return as string with warning
-                self.logger.error("Failed to parse scrubbed data back to JSON format")
-                return scrubbed_text
-        else:
+        try:
+            return TextProcessingUtils.restore_data_format(scrubbed_text, is_dict_input, fallback_to_string=True)
+        except ValueError:
+            # If restoration fails, log and return as string
+            self.logger.error("Failed to parse scrubbed data back to JSON format")
             return scrubbed_text
     
     def _create_scrubbing_summary(self, request_id: str, pii_detected: List[PIIType], pii_matches: Dict[PIIType, List], 
@@ -289,13 +292,13 @@ class PIIScrubbingAgent:
             step_type="PII_SCRUBBING",
             llm_model_name="n/a",
             llm_provider="n/a",
-            llm_input=json.dumps({
+            llm_input=JsonUtils.safe_dumps({
                 "original_data_length": len(text_data),
                 "pii_types_detected": [t.value for t in pii_detected],
                 "masking_strategy": strategy.value,
                 "context": self.context.value
             }),
-            llm_output=json.dumps({
+            llm_output=JsonUtils.safe_dumps({
                 "scrubbed_data_preview": scrubbed_text[:200] + "..." if len(scrubbed_text) > 200 else scrubbed_text,
                 "pii_instances_processed": sum(len(matches) for matches in pii_matches.values()),
                 "tokens_generated": scrubbing_summary.get('tokens_generated', 0)
@@ -304,7 +307,7 @@ class PIIScrubbingAgent:
             tokens_output=0,
             tool_calls=[],
             retrieved_chunks=[],
-            final_decision=json.dumps({
+            final_decision=JsonUtils.safe_dumps({
                 "scrubbed_data_length": len(str(result['scrubbed_data'])),
                 "pii_types_detected": [t.value for t in result['pii_detected']],
                 "scrubbing_summary": result['scrubbing_summary']
@@ -389,7 +392,11 @@ class PIIScrubbingAgent:
             
             # Log exception to audit trail
             if audit_level > 0:
-                self._log_exception_to_audit(request_id, "PII_SCRUBBING", e, audit_level)
+                self._log_exception_to_audit(request_id, e, "PII_SCRUBBING", {
+                    "context": self.context.value,
+                    "audit_level": audit_level,
+                    "enable_tokenization": self.enable_tokenization
+                }, "pii_scrubbing")
             
             raise Exception(error_msg)
     
@@ -550,12 +557,7 @@ class PIIScrubbingAgent:
         self.logger.info(f"Starting detokenization for request: {request_id}")
         
         # Convert to string for processing
-        if isinstance(data, dict):
-            text_data = json.dumps(data, indent=2)
-            is_dict_input = True
-        else:
-            text_data = str(data)
-            is_dict_input = False
+        text_data, is_dict_input = TextProcessingUtils.prepare_input_data(data)
         
         # Find and replace tokens
         restored_text = text_data
@@ -567,13 +569,7 @@ class PIIScrubbingAgent:
                 tokens_found.append(token)
         
         # Convert back to original format
-        if is_dict_input:
-            try:
-                restored_data = json.loads(restored_text)
-            except json.JSONDecodeError:
-                restored_data = restored_text
-        else:
-            restored_data = restored_text
+        restored_data = TextProcessingUtils.restore_data_format(restored_text, is_dict_input)
         
         self.logger.info(f"Detokenization completed. Restored {len(tokens_found)} tokens")
         
@@ -628,39 +624,34 @@ class PIIScrubbingAgent:
         
         return audit_entry
     
-    def _log_exception_to_audit(self, request_id: str, operation: str, exception: Exception, audit_level: int):
-        """Log exceptions to audit trail with context"""
+    # _log_exception_to_audit() method now inherited from BaseAgent
+    
+    def get_agent_info(self) -> Dict[str, Any]:
+        """
+        Get agent information including capabilities and configuration.
         
-        error_entry = {
-            'timestamp': datetime.now(timezone.utc).isoformat(),
-            'request_id': request_id,
-            'agent_id': self.agent_id,
-            'operation': operation,
-            'error_type': type(exception).__name__,
-            'error_message': str(exception),
-            'context': self.context.value,
-            'audit_level': audit_level
+        Returns:
+            Dictionary containing agent information
+        """
+        return {
+            "agent_name": self.agent_name,
+            "agent_id": self.agent_id,
+            "version": self.version,
+            "model_name": self.model_name,
+            "llm_provider": self.llm_provider,
+            "capabilities": [
+                "pii_detection",
+                "data_masking",
+                "tokenization",
+                "audit_compliance",
+                "reversible_scrubbing"
+            ],
+            "supported_pii_types": [pii_type.value for pii_type in PIIType],
+            "supported_contexts": [context.value for context in PIIContext],
+            "masking_strategies": [strategy.value for strategy in MaskingStrategy],
+            "configuration": {
+                "context": self.context.value,
+                "tokenization_enabled": self.enable_tokenization,
+                "patterns_count": len(self.patterns) if hasattr(self, 'patterns') else 0
+            }
         }
-        
-        self.audit_system.log_agent_activity(
-            request_id=request_id,
-            user_id="system",
-            session_id="pii_error",
-            ip_address="internal",
-            agent_id=self.agent_id,
-            agent_name="PII Scrubbing Agent",
-            agent_version=self.version,
-            step_type="PII_ERROR",
-            llm_model_name="n/a",
-            llm_provider="n/a",
-            llm_input="PII operation failed",
-            llm_output=json.dumps(error_entry),
-            tokens_input=0,
-            tokens_output=0,
-            tool_calls=[],
-            retrieved_chunks=[],
-            final_decision=json.dumps({'error': str(exception)}),
-            duration_ms=0,
-            error_details=error_entry,
-            audit_level=audit_level
-        )
