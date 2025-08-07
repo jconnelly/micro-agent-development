@@ -23,7 +23,7 @@ import re
 import hashlib
 import json
 import uuid
-from typing import Dict, List, Any, Optional, Tuple, Union
+from typing import Dict, List, Any, Optional, Tuple, Union, Pattern
 from enum import Enum
 from datetime import datetime, timezone
 import secrets
@@ -126,8 +126,9 @@ class PIIScrubbingAgent(BaseAgent):
         self._initialize_context_config()
     
     def _initialize_patterns(self):
-        """Initialize regex patterns for different PII types"""
-        self.patterns = {
+        """Initialize and pre-compile regex patterns for different PII types for optimal performance"""
+        # Raw pattern definitions
+        raw_patterns = {
             PIIType.SSN: [
                 r'\b\d{3}-\d{2}-\d{4}\b',  # 123-45-6789
                 r'\b\d{3}\s\d{2}\s\d{4}\b',  # 123 45 6789
@@ -140,7 +141,7 @@ class PIIScrubbingAgent(BaseAgent):
                 r'\b6011[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b'  # Discover
             ],
             PIIType.PHONE_NUMBER: [
-                r'\b\(\d{3}\)\s?\d{3}-\d{4}\b',  # (555) 123-4567
+                r'(?<!\d)\(\d{3}\)\s?\d{3}-\d{4}(?!\d)',  # (555) 123-4567
                 r'\b\d{3}-\d{3}-\d{4}\b',  # 555-123-4567
                 r'\b\d{3}\.\d{3}\.\d{4}\b',  # 555.123.4567
                 r'\b\d{10}\b'  # 5551234567
@@ -160,6 +161,32 @@ class PIIScrubbingAgent(BaseAgent):
                 r'\b\d{9}\b'  # 9-digit routing numbers
             ]
         }
+        
+        # Pre-compile all patterns for significant performance improvement
+        self.compiled_patterns: Dict[PIIType, List[Tuple[Pattern[str], str]]] = {}
+        self.patterns = {}  # Keep raw patterns for backward compatibility
+        
+        for pii_type, pattern_list in raw_patterns.items():
+            compiled_list = []
+            raw_list = []
+            
+            for pattern_str in pattern_list:
+                try:
+                    # Pre-compile with IGNORECASE flag for performance
+                    compiled_pattern = re.compile(pattern_str, re.IGNORECASE)
+                    compiled_list.append((compiled_pattern, pattern_str))
+                    raw_list.append(pattern_str)
+                except re.error as e:
+                    # Log invalid patterns but continue
+                    self.logger.warning(f"Invalid regex pattern for {pii_type.value}: {pattern_str} - {e}")
+                    continue
+            
+            self.compiled_patterns[pii_type] = compiled_list
+            self.patterns[pii_type] = raw_list
+        
+        # Log compilation statistics
+        total_patterns = sum(len(patterns) for patterns in self.compiled_patterns.values())
+        self.logger.info(f"Pre-compiled {total_patterns} PII regex patterns for optimal performance")
     
     def _initialize_context_config(self):
         """Initialize context-specific PII handling configurations"""
@@ -421,14 +448,15 @@ class PIIScrubbingAgent(BaseAgent):
         for pii_type in all_types:
             type_matches = []
             
-            for pattern in self.patterns.get(pii_type, []):
-                found_matches = re.finditer(pattern, text, re.IGNORECASE)
+            # Use pre-compiled patterns for significant performance improvement
+            for compiled_pattern, original_pattern in self.compiled_patterns.get(pii_type, []):
+                found_matches = compiled_pattern.finditer(text)
                 for match in found_matches:
                     type_matches.append({
                         'value': match.group(),
                         'start': match.start(),
                         'end': match.end(),
-                        'pattern': pattern
+                        'pattern': original_pattern  # Keep original pattern string for compatibility
                     })
             
             if type_matches:
@@ -652,6 +680,8 @@ class PIIScrubbingAgent(BaseAgent):
             "configuration": {
                 "context": self.context.value,
                 "tokenization_enabled": self.enable_tokenization,
-                "patterns_count": len(self.patterns) if hasattr(self, 'patterns') else 0
+                "patterns_count": len(self.patterns) if hasattr(self, 'patterns') else 0,
+                "compiled_patterns_count": sum(len(patterns) for patterns in self.compiled_patterns.values()) if hasattr(self, 'compiled_patterns') else 0,
+                "performance_optimized": True
             }
         }

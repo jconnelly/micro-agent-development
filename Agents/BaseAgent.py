@@ -12,7 +12,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 from datetime import datetime, timezone
 
-from .LoggerAgent import AgentLogger
+from .Logger import AgentLogger
 from .AuditingAgent import AgentAuditing
 
 # Import Utils - handle both relative and absolute imports

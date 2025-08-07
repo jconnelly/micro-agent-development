@@ -45,3 +45,7 @@ audit_logs.jsonl
 
 # Output files
 Rule_Agent_Output_Files/
+
+# Documentation (development notes)
+Code_Cleanup.md
+CLAUDE.md
