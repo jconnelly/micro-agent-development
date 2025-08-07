@@ -3,6 +3,11 @@
 import json
 from typing import Any, Dict, List
 import os
+import sys
+
+# Add the parent directory to Python path for imports (since we're in Test_Cases subdirectory)
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, parent_dir)
 
 # Import the classes from their respective files
 from Agents.AuditingAgent import AgentAuditing, AuditLevel
@@ -16,6 +21,114 @@ from dotenv import load_dotenv
 
 # --- No more Mock LLM Client needed ---
 # The actual genai.Client will be used.
+
+def test_documentation_formats(rules_json_file: str, output_format: str = "markdown"):
+    """
+    Test RuleDocumentationAgent with pre-extracted rules from JSON file.
+    This allows testing different output formats without running rule extraction.
+    
+    Args:
+        rules_json_file: Path to JSON file containing extracted rules
+        output_format: Output format ('markdown', 'json', 'html')
+    """
+    print(f"\n=== Testing RuleDocumentationAgent with {output_format.upper()} format ===")
+    
+    # Load rules from JSON file
+    try:
+        with open(rules_json_file, 'r') as f:
+            extracted_rules = json.load(f)
+        print(f"Loaded {len(extracted_rules)} rules from {rules_json_file}")
+    except FileNotFoundError:
+        print(f"Error: {rules_json_file} not found.")
+        return
+    except Exception as e:
+        print(f"Error reading {rules_json_file}: {e}")
+        return
+
+    # Initialize AgentAuditing
+    audit_log_file_path = f"./Rule_Agent_Output_Files/doc_test_{output_format}_audit.jsonl"
+    audit_system = AgentAuditing(log_storage_path=audit_log_file_path)
+    print(f"AgentAuditing initialized for {output_format} format test.")
+
+    # Configure Gemini API (though we won't use LLM for this test)
+    try:
+        load_dotenv()
+        api_key = os.getenv('GEMINI_API_KEY')        
+        genai.configure(api_key=api_key)
+        real_llm_client = genai.GenerativeModel('gemini-1.5-flash')
+        print("Gemini API configured (not used for this test).")
+    except Exception as e:
+        print(f"Warning: Gemini API configuration failed: {e}")
+        real_llm_client = None
+
+    # Initialize RuleDocumentationAgent
+    doc_agent = RuleDocumentationAgent(real_llm_client, audit_system)
+
+    # Generate documentation in specified format
+    print(f"\nGenerating {output_format} documentation...")
+    result = doc_agent.document_and_visualize_rules(
+        extracted_rules=extracted_rules,
+        output_format=output_format,
+        audit_level=AuditLevel.LEVEL_1.value
+    )
+
+    # Access the documentation result
+    generated_docs = result.get("generated_documentation", "")
+    doc_audit_log = result.get("audit_log", {})
+
+    print(f"\nGenerated documentation for {len(extracted_rules)} business rules in {output_format} format.")
+    
+    # Display the generated documentation
+    print("\n" + "="*80)
+    print(f"GENERATED BUSINESS RULES DOCUMENTATION ({output_format.upper()})")
+    print("="*80)
+    print(generated_docs)
+    print("="*80)
+
+    # Save documentation to format-specific file
+    file_extensions = {
+        "markdown": "md",
+        "json": "json", 
+        "html": "html"
+    }
+    
+    extension = file_extensions.get(output_format, "txt")
+    doc_output_file_path = f"./Rule_Agent_Output_Files/business_rules_documentation_{output_format}.{extension}"
+    
+    try:
+        with open(doc_output_file_path, 'w') as f:
+            f.write(generated_docs)
+        print(f"\nDocumentation saved to {doc_output_file_path}")
+    except Exception as e:
+        print(f"Error writing documentation to file: {e}")
+
+    print(f"\n{output_format.capitalize()} format test complete!")
+    return result
+
+def test_all_documentation_formats(rules_json_file: str):
+    """
+    Test all documentation formats (markdown, json, html) with the same rule set.
+    
+    Args:
+        rules_json_file: Path to JSON file containing extracted rules
+    """
+    print("\n" + "="*80)
+    print("TESTING ALL DOCUMENTATION FORMATS")
+    print("="*80)
+    
+    formats = ["markdown", "json", "html"]
+    
+    for format_name in formats:
+        try:
+            result = test_documentation_formats(rules_json_file, format_name)
+            print(f"[PASS] {format_name.capitalize()} format test passed")
+        except Exception as e:
+            print(f"[FAIL] {format_name.capitalize()} format test failed: {e}")
+    
+    print(f"\n[SUCCESS] All format tests complete! Check ./Rule_Agent_Output_Files/ for output files:")
+    for format_name in formats:
+        extension = {"markdown": "md", "json": "json", "html": "html"}[format_name]
+        print(f"   - business_rules_documentation_{format_name}.{extension}")
 
 def main():
     # Define file paths
@@ -135,4 +248,27 @@ def main():
     print("\nDemonstration complete. Check 'extracted_rules_output.json', 'business_rules_documentation.md', and 'audit_logs.jsonl' files.")
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Test RuleDocumentationAgent with different modes")
+    parser.add_argument("--mode", choices=["full", "formats", "single-format"], default="full", 
+                       help="Test mode: 'full' runs complete extraction+documentation, 'formats' tests all formats with existing JSON, 'single-format' tests one format")
+    parser.add_argument("--format", choices=["markdown", "json", "html"], default="markdown",
+                       help="Output format for single-format mode")
+    parser.add_argument("--rules-file", default="./Rule_Agent_Output_Files/extracted_rules_output.json",
+                       help="Path to extracted rules JSON file")
+    
+    args = parser.parse_args()
+    
+    if args.mode == "full":
+        # Run the original full extraction + documentation workflow
+        print("Running full extraction and documentation workflow...")
+        main()
+    elif args.mode == "formats":
+        # Test all formats with existing extracted rules
+        print(f"Testing all documentation formats with rules from: {args.rules_file}")
+        test_all_documentation_formats(args.rules_file)
+    elif args.mode == "single-format":
+        # Test single format with existing extracted rules
+        print(f"Testing {args.format} format with rules from: {args.rules_file}")
+        test_documentation_formats(args.rules_file, args.format)

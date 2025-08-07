@@ -6,6 +6,7 @@ import datetime
 import time
 import asyncio
 from typing import Dict, Any, List, Optional
+from functools import lru_cache
 
 # Import other Agents from current location, change package location if moved
 from .BaseAgent import BaseAgent
@@ -86,6 +87,23 @@ class LegacyRuleExtractionAgent(BaseAgent):
         """
         Extract file context (headers, imports, templates, comments) from the beginning of the file.
         This context will be included with each chunk to provide necessary background.
+        Uses caching for performance optimization on repeated file processing.
+        """
+        # Use cached implementation for performance optimization
+        lines_tuple = tuple(lines[:max_lines])  # Convert to tuple for hashing
+        return list(self._cached_extract_file_context(lines_tuple, max_lines))
+    
+    @lru_cache(maxsize=128)  # Cache up to 128 unique file context extractions
+    def _cached_extract_file_context(self, lines_tuple: tuple, max_lines: int = 50) -> tuple:
+        """
+        Cached file context extraction implementation for performance optimization.
+        
+        Args:
+            lines_tuple: Tuple of file lines for cache-friendly hashing
+            max_lines: Maximum number of lines to examine for context
+            
+        Returns:
+            Tuple of context lines (converted back to list by caller)
         """
         context_lines = []
         context_keywords = [
@@ -95,7 +113,7 @@ class LegacyRuleExtractionAgent(BaseAgent):
             ';; ', '# ', '// ', '/* ', '<!--'
         ]
         
-        for i, line in enumerate(lines[:max_lines]):
+        for i, line in enumerate(lines_tuple):
             line_lower = line.lower().strip()
             
             # Include header comments and metadata
@@ -106,7 +124,7 @@ class LegacyRuleExtractionAgent(BaseAgent):
                 'entity-engine-xml' in line_lower):
                 context_lines.append(line)
         
-        return context_lines
+        return tuple(context_lines)  # Return tuple for caching
     
     def _find_smart_boundary(self, lines: List[str], target_pos: int, search_window: int = 10) -> int:
         """
@@ -313,8 +331,11 @@ class LegacyRuleExtractionAgent(BaseAgent):
         total_time = time.time() - chunk_start_time
         self._log_chunk_completion_summary(total_time, all_rules, chunks, request_id)
         
-        llm_response_raw = f"Processed {len(chunks)} chunks, extracted {len(all_rules)} rules"
-        return all_rules, total_tokens_input, total_tokens_output, llm_response_raw
+        # Deduplicate rules while preserving clean rule IDs
+        deduplicated_rules = self._deduplicate_rules(all_rules, request_id)
+        
+        llm_response_raw = f"Processed {len(chunks)} chunks, extracted {len(deduplicated_rules)} rules (deduplicated from {len(all_rules)} raw)"
+        return deduplicated_rules, total_tokens_input, total_tokens_output, llm_response_raw
     
     def _process_single_file(self, legacy_code_snippet: str, context: Optional[str], request_id: str) -> tuple[List[Dict], int, int, str]:
         """
@@ -366,11 +387,8 @@ class LegacyRuleExtractionAgent(BaseAgent):
         chunk_response_raw = chunk_response.text
         chunk_response_data = json.loads(chunk_response_raw)
         
-        # Handle different response formats and add chunk info to prevent duplicates
+        # Handle different response formats - no need to modify rule_ids here
         chunk_rules = self._aggregate_chunk_results([chunk_response_data])
-        for rule in chunk_rules:
-            if 'rule_id' in rule:
-                rule['rule_id'] = f"chunk{chunk_idx + 1}_{rule['rule_id']}"
         
         # Track tokens
         tokens_input = 0
@@ -417,6 +435,51 @@ class LegacyRuleExtractionAgent(BaseAgent):
                 all_rules.append(rules)
         
         return all_rules
+    
+    def _deduplicate_rules(self, all_rules: List[Dict], request_id: str) -> List[Dict]:
+        """
+        Intelligently deduplicate rules while preserving clean rule IDs.
+        
+        Args:
+            all_rules: List of all rules from all chunks
+            request_id: Request identifier for logging
+            
+        Returns:
+            Deduplicated list of rules with clean IDs
+        """
+        if not all_rules:
+            return all_rules
+        
+        seen_rule_ids = set()
+        deduplicated_rules = []
+        duplicate_count = 0
+        
+        for rule in all_rules:
+            rule_id = rule.get('rule_id', 'unknown_rule')
+            
+            if rule_id not in seen_rule_ids:
+                # First occurrence - keep as is
+                seen_rule_ids.add(rule_id)
+                deduplicated_rules.append(rule)
+            else:
+                # Duplicate found - create a unique ID by appending a suffix
+                duplicate_count += 1
+                original_id = rule_id
+                counter = 2
+                
+                # Find a unique suffix
+                while f"{original_id}_v{counter}" in seen_rule_ids:
+                    counter += 1
+                
+                unique_id = f"{original_id}_v{counter}"
+                rule['rule_id'] = unique_id
+                seen_rule_ids.add(unique_id)
+                deduplicated_rules.append(rule)
+        
+        if duplicate_count > 0:
+            self.logger.info(f"Deduplicated {duplicate_count} duplicate rule IDs with clean suffixes (_v2, _v3, etc.)", request_id=request_id)
+        
+        return deduplicated_rules
     
     def _create_progress_reporter(self, chunk_idx: int, total_chunks: int, start_time: float, request_id: str) -> None:
         """

@@ -82,15 +82,20 @@ class AgentAuditing:
 
         fields_to_include = self.audit_field_mapping.get(audit_level, [])
         filtered_log = {}
+        
+        # Pre-define sets for O(1) lookup performance instead of O(n) list searches
+        sensitive_fields = {"user_id", "ip_address"}
+        anonymous_values = {"anonymous", "N/A"}
+        json_serializable_fields = {"llm_input", "llm_output", "final_decision"}
 
         for field in fields_to_include:
             if field in raw_log:
                 value = raw_log[field]
-                # Special handling for sensitive data: Redact or anonymize PII
-                if field in ["user_id", "ip_address"] and value not in ["anonymous", "N/A"]:
+                # Special handling for sensitive data: Redact or anonymize PII (O(1) set lookup)
+                if field in sensitive_fields and value not in anonymous_values:
                     filtered_log[field] = self._anonymize_pii(str(value))
-                # For complex objects like llm_input/output, ensure they are JSON serializable
-                elif field in ["llm_input", "llm_output", "final_decision"] and isinstance(value, (dict, list)):
+                # For complex objects like llm_input/output, ensure they are JSON serializable (O(1) set lookup)
+                elif field in json_serializable_fields and isinstance(value, (dict, list)):
                     try:
                         filtered_log[field] = json.dumps(value)
                     except TypeError:

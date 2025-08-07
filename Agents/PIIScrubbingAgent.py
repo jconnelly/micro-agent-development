@@ -28,6 +28,7 @@ from enum import Enum
 from datetime import datetime, timezone
 import secrets
 import string
+from functools import lru_cache
 
 # Import other Agents from current location, change package location if moved
 from .BaseAgent import BaseAgent
@@ -429,9 +430,25 @@ class PIIScrubbingAgent(BaseAgent):
     
     def _detect_pii(self, text: str) -> Dict[str, Any]:
         """
-        Detect PII in the given text using regex patterns.
+        Detect PII in the given text using regex patterns with caching for performance.
         
         Args:
+            text: Text to scan for PII
+            
+        Returns:
+            Dictionary with detected types and matches
+        """
+        # Use cached detection for improved performance on repeated text
+        cache_key = (text, self.context.value)  # Include context in cache key
+        return self._cached_detect_pii(cache_key, text)
+    
+    @lru_cache(maxsize=256)  # Cache up to 256 unique text/context combinations
+    def _cached_detect_pii(self, cache_key: Tuple[str, str], text: str) -> Dict[str, Any]:
+        """
+        Cached PII detection implementation for performance optimization.
+        
+        Args:
+            cache_key: Tuple of (text, context) for cache discrimination
             text: Text to scan for PII
             
         Returns:
@@ -442,8 +459,10 @@ class PIIScrubbingAgent(BaseAgent):
         
         priority_types = self.context_configs[self.context]['priority_types']
         
-        # Check priority types first, then others
-        all_types = priority_types + [t for t in PIIType if t not in priority_types]
+        # Check priority types first, then others - use set for O(1) lookup instead of O(n) list search
+        priority_set = set(priority_types)
+        remaining_types = [t for t in PIIType if t not in priority_set]
+        all_types = priority_types + remaining_types
         
         for pii_type in all_types:
             type_matches = []

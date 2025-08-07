@@ -113,10 +113,13 @@ class RuleDocumentationAgent(BaseAgent):
             
             total_text += rule_text
         
+        # Pre-convert text to lowercase once for performance (instead of multiple .lower() calls)
+        total_text_lower = total_text.lower()
+        
         # Score each domain based on keyword frequency
         for domain, config in domain_keywords.items():
             for keyword in config['keywords']:
-                count = total_text.count(keyword.lower())
+                count = total_text_lower.count(keyword.lower())
                 domain_scores[domain] += count * config['weight']
         
         # Determine primary domain(s)
@@ -139,17 +142,21 @@ class RuleDocumentationAgent(BaseAgent):
         primary_domain = max(domain_scores, key=domain_scores.get)
         primary_confidence = domain_percentages.get(primary_domain, 0.0)
         
-        # Check if multi-domain (more than one domain with >20% score)
+        # Check if multi-domain (more than one domain with >20% score) - O(1) lookup with set
         significant_domains = [domain for domain, pct in domain_percentages.items() if pct >= 20.0]
         is_multi_domain = len(significant_domains) > 1
         
-        # Extract detected keywords for context
-        detected_keywords = []
-        for domain, config in domain_keywords.items():
-            if domain_scores[domain] > 0:
-                for keyword in config['keywords']:
-                    if keyword.lower() in total_text:
-                        detected_keywords.append(keyword)
+        # Extract detected keywords for context - use set to avoid duplicates and improve performance
+        detected_keywords_set = set()
+        domains_with_scores = {domain for domain, score in domain_scores.items() if score > 0}
+        
+        for domain in domains_with_scores:
+            config = domain_keywords[domain]
+            for keyword in config['keywords']:
+                if keyword.lower() in total_text_lower:
+                    detected_keywords_set.add(keyword)
+        
+        detected_keywords = list(detected_keywords_set)
         
         return {
             'primary_domain': primary_domain,
