@@ -3,7 +3,16 @@
 ## Project Overview
 This document tracks the systematic cleanup and optimization of all Agent classes based on the comprehensive analysis in `Code_Cleanup.md`. The goal is to make all agents as lean, efficient, and maintainable as possible while preserving 100% functionality.
 
+### 🔄 Commit Workflow
+**CRITICAL**: After completing each phase, code MUST be committed to GitHub with:
+1. Descriptive commit message including impact summary
+2. All affected files staged and committed
+3. Immediate push to origin/main
+4. Update CLAUDE.md with new commit hash
+5. Mark phase as ✅ COMPLETED with commit reference
+
 **Baseline Commit**: `7dba69a` - Complete production-ready system with PII protection
+**Phase 1 Commit**: `178e8bc` - Monster functions broken down across all agents
 **Repository**: https://github.com/jconnelly/micro-agent-development
 
 ---
@@ -198,29 +207,35 @@ This document tracks the systematic cleanup and optimization of all Agent classe
 
 ### Overall Progress: 17% Complete (4/23 tasks)
 
-#### Phase 1 - Critical Issues: 100% COMPLETED (4/4 tasks)
+#### Phase 1 - Critical Issues: 100% COMPLETED (4/4 tasks) ✅
 - [x] Break down monster functions (4 functions) - **ALL COMPLETED**
+- [x] **COMMIT TO GITHUB**: `178e8bc` - Phase 1 monster function refactoring
 
 #### Phase 2 - Code Duplication: 0% (0/2 tasks)  
 - [ ] Create BaseAgent class
 - [ ] Extract shared utilities
+- [ ] **COMMIT TO GITHUB**: TBD - Phase 2 code deduplication
 
 #### Phase 3 - Performance: 0% (0/3 tasks)
 - [ ] Pre-compile regex patterns  
 - [ ] Replace list searches with sets
 - [ ] Add caching for expensive operations
+- [ ] **COMMIT TO GITHUB**: TBD - Phase 3 performance optimizations
 
 #### Phase 4 - Configuration: 0% (0/1 task)
 - [ ] Externalize all configuration
+- [ ] **COMMIT TO GITHUB**: TBD - Phase 4 configuration externalization
 
 #### Phase 5 - Tool Integration: 0% (0/2 tasks)
 - [ ] File I/O → Tool calls
 - [ ] PII detection → Grep tool
+- [ ] **COMMIT TO GITHUB**: TBD - Phase 5 tool call integrations
 
 #### Phase 6 - Code Quality: 0% (0/3 tasks)
 - [ ] Complete type hints
 - [ ] Standardize error handling
 - [ ] Complete incomplete code
+- [ ] **COMMIT TO GITHUB**: TBD - Phase 6 code quality improvements
 
 ---
 
@@ -232,9 +247,18 @@ This document tracks the systematic cleanup and optimization of all Agent classe
 - Benchmark performance improvements
 - Validate audit trail completeness
 
+### Commit Strategy
+✅ **REQUIRED**: Commit code to GitHub after each major optimization section
+- Each phase should be a separate commit with descriptive message
+- Include impact summary and testing notes in commit messages
+- Tag commits for easy rollback (Phase1: `178e8bc`, Phase2: TBD, etc.)
+- Push immediately after each phase completion
+
 ### Rollback Plan
-- Each phase should be a separate commit
-- Can rollback to baseline commit `7dba69a` if needed
+- Can rollback to any phase commit if needed:
+  - Baseline: `7dba69a` (original system)
+  - Phase 1: `178e8bc` (monster functions broken down)
+  - Phase 2+: TBD
 - GitHub repository provides safe backup: https://github.com/jconnelly/micro-agent-development
 
 ### Success Criteria
