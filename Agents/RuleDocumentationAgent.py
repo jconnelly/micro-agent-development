@@ -215,6 +215,117 @@ class RuleDocumentationAgent:
         
         return summary
 
+    def _prepare_documentation_data(self, extracted_rules: List[Dict], request_id: str) -> tuple[str, List[Dict], int, int, str]:
+        """
+        Prepare documentation data and generate summary.
+        
+        Returns:
+            Tuple of (documentation_summary, refined_rules, tokens_input, tokens_output, llm_response_raw)
+        """
+        try:
+            print(f"[{request_id}] Processing rule documentation (using actual extracted rules).")
+            
+            # Generate a dynamic summary based on domain classification
+            rule_count = len(extracted_rules)
+            domain_info = self._classify_business_domain(extracted_rules)
+            documentation_summary = self._generate_domain_summary(domain_info, rule_count)
+            
+            # Use the actual extracted rules passed in
+            refined_rules = extracted_rules
+            
+            # Mock token counts for audit
+            tokens_input = len(str(extracted_rules))
+            tokens_output = len(documentation_summary) + sum(len(str(rule)) for rule in refined_rules)
+            llm_response_raw = f"Generated documentation for {len(refined_rules)} business rules"
+            
+            return documentation_summary, refined_rules, tokens_input, tokens_output, llm_response_raw
+            
+        except Exception as e:
+            error_details = f"Documentation preparation failed: {e}"
+            print(f"[{request_id}] {error_details}")
+            # Return defaults for failed processing
+            return "Failed to generate summary.", [], 0, 0, None
+    
+    def _generate_markdown_output(self, documentation_summary: str, refined_rules: List[Dict]) -> str:
+        """
+        Generate documentation in Markdown format.
+        
+        Returns:
+            Markdown formatted documentation string
+        """
+        generated_documentation = f"# Business Rules Documentation\n\n"
+        generated_documentation += f"## Summary\n{documentation_summary}\n\n"
+        generated_documentation += f"## Detailed Rules\n\n"
+        
+        for rule in refined_rules:
+            generated_documentation += f"### Rule ID: {rule.get('rule_id', 'N/A')}\n"
+            generated_documentation += f"- **Business Description:** {rule.get('business_description', 'N/A')}\n"
+            generated_documentation += f"- **Conditions:** `{rule.get('conditions', 'N/A')}`\n"
+            generated_documentation += f"- **Actions:** `{rule.get('actions', 'N/A')}`\n"
+            generated_documentation += f"- **Source Code Lines:** {rule.get('source_code_lines', 'N/A')}\n\n"
+        
+        # Conceptual placeholder for visualization link
+        generated_documentation += f"## Rule Flow Visualization\n"
+        generated_documentation += f"A conceptual visualization of rule execution flow can be generated here (e.g., link to a diagram).\n"
+        
+        return generated_documentation
+    
+    def _generate_json_output(self, documentation_summary: str, refined_rules: List[Dict]) -> str:
+        """
+        Generate documentation in JSON format.
+        
+        Returns:
+            JSON formatted documentation string
+        """
+        return json.dumps({
+            "summary": documentation_summary,
+            "detailed_rules": refined_rules,
+            "visualization_note": "Conceptual visualization link/data would be here."
+        }, indent=2)
+    
+    def _generate_html_output(self, documentation_summary: str, refined_rules: List[Dict]) -> str:
+        """
+        Generate documentation in HTML format.
+        
+        Returns:
+            HTML formatted documentation string
+        """
+        generated_documentation = f"<h1>Business Rules Documentation</h1>"
+        generated_documentation += f"<h2>Summary</h2><p>{documentation_summary}</p>"
+        generated_documentation += f"<h2>Detailed Rules</h2><ul>"
+        
+        for rule in refined_rules:
+            generated_documentation += f"<li><h3>Rule ID: {rule.get('rule_id', 'N/A')}</h3>"
+            generated_documentation += f"<p><b>Business Description:</b> {rule.get('business_description', 'N/A')}</p>"
+            generated_documentation += f"<p><b>Conditions:</b> <code>{rule.get('conditions', 'N/A')}</code></p>"
+            generated_documentation += f"<p><b>Actions:</b> <code>{rule.get('actions', 'N/A')}</code></p>"
+            generated_documentation += f"<p><b>Source Code Lines:</b> {rule.get('source_code_lines', 'N/A')}</p></li>"
+        
+        generated_documentation += f"</ul><h2>Rule Flow Visualization</h2><p>A conceptual visualization of rule execution flow can be embedded here (e.g., an SVG or image).</p>"
+        
+        return generated_documentation
+    
+    def _generate_formatted_output(self, output_format: str, documentation_summary: str, refined_rules: List[Dict]) -> tuple[str, Optional[str]]:
+        """
+        Generate documentation in the specified format.
+        
+        Returns:
+            Tuple of (generated_documentation, error_details)
+        """
+        error_details = None
+        
+        if output_format == "markdown":
+            generated_documentation = self._generate_markdown_output(documentation_summary, refined_rules)
+        elif output_format == "json":
+            generated_documentation = self._generate_json_output(documentation_summary, refined_rules)
+        elif output_format == "html":
+            generated_documentation = self._generate_html_output(documentation_summary, refined_rules)
+        else:
+            generated_documentation = "Unsupported output format."
+            error_details = "Unsupported output format specified."
+        
+        return generated_documentation, error_details
+
     def document_and_visualize_rules(self, extracted_rules: List[Dict], output_format: str = "markdown", audit_level: int = AuditLevel.LEVEL_1.value) -> Dict[str, Any]:
         """
         Generates documentation and conceptual visualization for a set of extracted business rules.
@@ -245,78 +356,20 @@ class RuleDocumentationAgent:
             "model_name": "gemini-1.5-flash" # Using Gemini 1.5 Flash for code analysis
         }
 
-        llm_response_raw: Optional[str] = None
-        documentation_summary: str = "Failed to generate summary."
-        refined_rules: List[Dict] = []
-        tokens_input = 0
-        tokens_output = 0
-        error_details: Optional[str] = None
+        # 2. Prepare documentation data
+        documentation_summary, refined_rules, tokens_input, tokens_output, llm_response_raw = self._prepare_documentation_data(
+            extracted_rules, request_id
+        )
 
-        try:
-            # For now, use the extracted rules directly instead of calling LLM
-            # In production, you would call the actual LLM API here
-            print(f"[{request_id}] Processing rule documentation (using actual extracted rules).")
-            
-            # Generate a dynamic summary based on domain classification
-            rule_count = len(extracted_rules)
-            domain_info = self._classify_business_domain(extracted_rules)
-            documentation_summary = self._generate_domain_summary(domain_info, rule_count)
-            
-            # Use the actual extracted rules passed in
-            refined_rules = extracted_rules
-            
-            # Mock token counts for audit
-            tokens_input = len(system_prompt) + len(user_prompt)
-            tokens_output = len(documentation_summary) + sum(len(str(rule)) for rule in refined_rules)
-            llm_response_raw = f"Generated documentation for {len(refined_rules)} business rules"
+        # 3. Generate documentation in specified format
+        generated_documentation, error_details = self._generate_formatted_output(
+            output_format, documentation_summary, refined_rules
+        )
 
-        except json.JSONDecodeError as e:
-            error_details = f"LLM response was not valid JSON for documentation: {e}"
-            print(f"[{request_id}] {error_details}")
-        except Exception as e:
-            error_details = f"LLM call or processing failed for documentation: {e}"
-            print(f"[{request_id}] {error_details}")
-
-        # 2. Generate documentation in specified format
-        generated_documentation = ""
-        if output_format == "markdown":
-            generated_documentation += f"# Business Rules Documentation\n\n"
-            generated_documentation += f"## Summary\n{documentation_summary}\n\n"
-            generated_documentation += f"## Detailed Rules\n\n"
-            for rule in refined_rules:
-                generated_documentation += f"### Rule ID: {rule.get('rule_id', 'N/A')}\n"
-                generated_documentation += f"- **Business Description:** {rule.get('business_description', 'N/A')}\n"
-                generated_documentation += f"- **Conditions:** `{rule.get('conditions', 'N/A')}`\n"
-                generated_documentation += f"- **Actions:** `{rule.get('actions', 'N/A')}`\n"
-                generated_documentation += f"- **Source Code Lines:** {rule.get('source_code_lines', 'N/A')}\n\n"
-            # Conceptual placeholder for visualization link
-            generated_documentation += f"## Rule Flow Visualization\n"
-            generated_documentation += f"A conceptual visualization of rule execution flow can be generated here (e.g., link to a diagram).\n"
-        elif output_format == "json":
-            generated_documentation = json.dumps({
-                "summary": documentation_summary,
-                "detailed_rules": refined_rules,
-                "visualization_note": "Conceptual visualization link/data would be here."
-            }, indent=2)
-        elif output_format == "html":
-            generated_documentation += f"<h1>Business Rules Documentation</h1>"
-            generated_documentation += f"<h2>Summary</h2><p>{documentation_summary}</p>"
-            generated_documentation += f"<h2>Detailed Rules</h2><ul>"
-            for rule in refined_rules:
-                generated_documentation += f"<li><h3>Rule ID: {rule.get('rule_id', 'N/A')}</h3>"
-                generated_documentation += f"<p><b>Business Description:</b> {rule.get('business_description', 'N/A')}</p>"
-                generated_documentation += f"<p><b>Conditions:</b> <code>{rule.get('conditions', 'N/A')}</code></p>"
-                generated_documentation += f"<p><b>Actions:</b> <code>{rule.get('actions', 'N/A')}</code></p>"
-                generated_documentation += f"<p><b>Source Code Lines:</b> {rule.get('source_code_lines', 'N/A')}</p></li>"
-            generated_documentation += f"</ul><h2>Rule Flow Visualization</h2><p>A conceptual visualization of rule execution flow can be embedded here (e.g., an SVG or image).</p>"
-        else:
-            generated_documentation = "Unsupported output format."
-            error_details = "Unsupported output format specified."
-
+        # 4. Calculate processing duration and create audit entry
         end_time = datetime.datetime.now(datetime.timezone.utc)
         duration_ms = (end_time - start_time).total_seconds() * 1000
 
-        # 3. Call the AgentAuditing class after documentation generation
         audit_log_data = self.audit_system.log_agent_activity(
             request_id=request_id,
             user_id=user_id,

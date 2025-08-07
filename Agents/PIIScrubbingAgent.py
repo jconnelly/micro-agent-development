@@ -168,6 +168,153 @@ class PIIScrubbingAgent:
             }
         }
     
+    def _prepare_input_data(self, data: Union[str, Dict[str, Any]]) -> tuple[str, bool]:
+        """
+        Prepare input data for PII processing.
+        
+        Args:
+            data: Input data to prepare
+            
+        Returns:
+            Tuple of (text_data, is_dict_input)
+        """
+        if isinstance(data, dict):
+            text_data = json.dumps(data, indent=2)
+            is_dict_input = True
+        else:
+            text_data = str(data)
+            is_dict_input = False
+        
+        return text_data, is_dict_input
+    
+    def _perform_pii_detection(self, text_data: str, request_id: str) -> tuple[List[PIIType], Dict[PIIType, List]]:
+        """
+        Detect PII in text data and log results.
+        
+        Args:
+            text_data: Text to scan for PII
+            request_id: Request identifier for logging
+            
+        Returns:
+            Tuple of (pii_detected, pii_matches)
+        """
+        detection_results = self._detect_pii(text_data)
+        pii_detected = detection_results['detected_types']
+        pii_matches = detection_results['matches']
+        
+        self.logger.info(f"Detected {len(pii_detected)} PII types: {[t.value for t in pii_detected]}")
+        
+        return pii_detected, pii_matches
+    
+    def _apply_scrubbing_strategy(self, text_data: str, pii_matches: Dict[PIIType, List], custom_strategy: MaskingStrategy = None) -> tuple[str, MaskingStrategy]:
+        """
+        Apply the appropriate scrubbing strategy to the text data.
+        
+        Args:
+            text_data: Original text data
+            pii_matches: Detected PII matches
+            custom_strategy: Override default strategy
+            
+        Returns:
+            Tuple of (scrubbed_text, strategy_used)
+        """
+        strategy = custom_strategy or self.context_configs[self.context]['default_strategy']
+        scrubbed_text = self._apply_scrubbing(text_data, pii_matches, strategy)
+        
+        return scrubbed_text, strategy
+    
+    def _prepare_result_data(self, scrubbed_text: str, is_dict_input: bool) -> Union[str, Dict[str, Any]]:
+        """
+        Convert scrubbed text back to original format.
+        
+        Args:
+            scrubbed_text: The scrubbed text
+            is_dict_input: Whether original input was a dictionary
+            
+        Returns:
+            Scrubbed data in appropriate format
+        """
+        if is_dict_input:
+            try:
+                return json.loads(scrubbed_text)
+            except json.JSONDecodeError:
+                # If JSON parsing fails, return as string with warning
+                self.logger.error("Failed to parse scrubbed data back to JSON format")
+                return scrubbed_text
+        else:
+            return scrubbed_text
+    
+    def _create_scrubbing_summary(self, request_id: str, pii_detected: List[PIIType], pii_matches: Dict[PIIType, List], 
+                                  strategy: MaskingStrategy, operation_start: datetime) -> Dict[str, Any]:
+        """
+        Create a comprehensive summary of the scrubbing operation.
+        
+        Returns:
+            Dictionary containing scrubbing operation summary
+        """
+        return {
+            'request_id': request_id,
+            'pii_types_detected': [t.value for t in pii_detected],
+            'total_pii_instances': sum(len(matches) for matches in pii_matches.values()),
+            'masking_strategy': strategy.value,
+            'context': self.context.value,
+            'processing_duration_ms': (datetime.now(timezone.utc) - operation_start).total_seconds() * 1000,
+            'tokenization_enabled': self.enable_tokenization,
+            'tokens_generated': len([m for matches in pii_matches.values() for m in matches if strategy == MaskingStrategy.TOKENIZE])
+        }
+    
+    def _create_pii_audit_entry(self, request_id: str, text_data: str, pii_detected: List[PIIType], 
+                                pii_matches: Dict[PIIType, List], scrubbed_text: str, strategy: MaskingStrategy, 
+                                scrubbing_summary: Dict[str, Any], result: Dict[str, Any], audit_level: int) -> None:
+        """
+        Create and log audit entry for PII scrubbing operation.
+        """
+        audit_entry = self._create_audit_entry(
+            request_id=request_id,
+            operation="PII_SCRUBBING",
+            pii_detected=pii_detected,
+            strategy=strategy,
+            summary=scrubbing_summary,
+            audit_level=audit_level
+        )
+        
+        self.audit_system.log_agent_activity(
+            request_id=request_id,
+            user_id="system",
+            session_id="pii_scrubbing",
+            ip_address="internal",
+            agent_id=self.agent_id,
+            agent_name="PII Scrubbing Agent",
+            agent_version=self.version,
+            step_type="PII_SCRUBBING",
+            llm_model_name="n/a",
+            llm_provider="n/a",
+            llm_input=json.dumps({
+                "original_data_length": len(text_data),
+                "pii_types_detected": [t.value for t in pii_detected],
+                "masking_strategy": strategy.value,
+                "context": self.context.value
+            }),
+            llm_output=json.dumps({
+                "scrubbed_data_preview": scrubbed_text[:200] + "..." if len(scrubbed_text) > 200 else scrubbed_text,
+                "pii_instances_processed": sum(len(matches) for matches in pii_matches.values()),
+                "tokens_generated": scrubbing_summary.get('tokens_generated', 0)
+            }),
+            tokens_input=0,
+            tokens_output=0,
+            tool_calls=[],
+            retrieved_chunks=[],
+            final_decision=json.dumps({
+                "scrubbed_data_length": len(str(result['scrubbed_data'])),
+                "pii_types_detected": [t.value for t in result['pii_detected']],
+                "scrubbing_summary": result['scrubbing_summary']
+            }),
+            duration_ms=scrubbing_summary['processing_duration_ms'],
+            audit_level=audit_level
+        )
+        
+        result['audit_log'] = audit_entry
+
     def scrub_data(
         self, 
         data: Union[str, Dict[str, Any]], 
@@ -196,55 +343,27 @@ class PIIScrubbingAgent:
         
         # Set request ID for logger
         self.logger.request_id = request_id
-        
         self.logger.info(f"Starting PII scrubbing operation for request: {request_id}")
         
         try:
-            # Convert input to string for processing
-            if isinstance(data, dict):
-                text_data = json.dumps(data, indent=2)
-                is_dict_input = True
-            else:
-                text_data = str(data)
-                is_dict_input = False
+            # 1. Prepare input data
+            text_data, is_dict_input = self._prepare_input_data(data)
             
-            # Detect PII
-            detection_results = self._detect_pii(text_data)
-            pii_detected = detection_results['detected_types']
-            pii_matches = detection_results['matches']
+            # 2. Perform PII detection
+            pii_detected, pii_matches = self._perform_pii_detection(text_data, request_id)
             
-            self.logger.info(f"Detected {len(pii_detected)} PII types: {[t.value for t in pii_detected]}")
+            # 3. Apply scrubbing strategy
+            scrubbed_text, strategy = self._apply_scrubbing_strategy(text_data, pii_matches, custom_strategy)
             
-            # Apply scrubbing strategy
-            strategy = custom_strategy or self.context_configs[self.context]['default_strategy']
-            scrubbed_text = self._apply_scrubbing(text_data, pii_matches, strategy)
+            # 4. Prepare result data
+            scrubbed_data = self._prepare_result_data(scrubbed_text, is_dict_input)
             
-            # Convert back to original format
-            if is_dict_input:
-                try:
-                    scrubbed_data = json.loads(scrubbed_text)
-                except json.JSONDecodeError:
-                    # If JSON parsing fails, return as string with warning
-                    scrubbed_data = scrubbed_text
-                    self.logger.error("Failed to parse scrubbed data back to JSON format")
-            else:
-                scrubbed_data = scrubbed_text
-            
-            # Create scrubbing summary
-            scrubbing_summary = {
-                'request_id': request_id,
-                'pii_types_detected': [t.value for t in pii_detected],
-                'total_pii_instances': sum(len(matches) for matches in pii_matches.values()),
-                'masking_strategy': strategy.value,
-                'context': self.context.value,
-                'processing_duration_ms': (datetime.now(timezone.utc) - operation_start).total_seconds() * 1000,
-                'tokenization_enabled': self.enable_tokenization,
-                'tokens_generated': len([m for matches in pii_matches.values() for m in matches if strategy == MaskingStrategy.TOKENIZE])
-            }
+            # 5. Create scrubbing summary
+            scrubbing_summary = self._create_scrubbing_summary(request_id, pii_detected, pii_matches, strategy, operation_start)
             
             self.logger.info(f"PII scrubbing completed successfully")
             
-            # Create comprehensive result
+            # 6. Create comprehensive result
             result = {
                 'scrubbed_data': scrubbed_data,
                 'pii_detected': pii_detected,
@@ -257,53 +376,10 @@ class PIIScrubbingAgent:
                 )
             }
             
-            # Add to audit trail if required
+            # 7. Add to audit trail if required
             if audit_level > 0:
-                audit_entry = self._create_audit_entry(
-                    request_id=request_id,
-                    operation="PII_SCRUBBING",
-                    pii_detected=pii_detected,
-                    strategy=strategy,
-                    summary=scrubbing_summary,
-                    audit_level=audit_level
-                )
-                
-                self.audit_system.log_agent_activity(
-                    request_id=request_id,
-                    user_id="system",
-                    session_id="pii_scrubbing",
-                    ip_address="internal",
-                    agent_id=self.agent_id,
-                    agent_name="PII Scrubbing Agent",
-                    agent_version=self.version,
-                    step_type="PII_SCRUBBING",
-                    llm_model_name="n/a",
-                    llm_provider="n/a",
-                    llm_input=json.dumps({
-                        "original_data_length": len(text_data),
-                        "pii_types_detected": [t.value for t in pii_detected],
-                        "masking_strategy": strategy.value,
-                        "context": self.context.value
-                    }),
-                    llm_output=json.dumps({
-                        "scrubbed_data_preview": scrubbed_text[:200] + "..." if len(scrubbed_text) > 200 else scrubbed_text,
-                        "pii_instances_processed": sum(len(matches) for matches in pii_matches.values()),
-                        "tokens_generated": scrubbing_summary.get('tokens_generated', 0)
-                    }),
-                    tokens_input=0,
-                    tokens_output=0,
-                    tool_calls=[],
-                    retrieved_chunks=[],
-                    final_decision=json.dumps({
-                        "scrubbed_data_length": len(str(result['scrubbed_data'])),
-                        "pii_types_detected": [t.value for t in result['pii_detected']],
-                        "scrubbing_summary": result['scrubbing_summary']
-                    }),
-                    duration_ms=scrubbing_summary['processing_duration_ms'],
-                    audit_level=audit_level
-                )
-                
-                result['audit_log'] = audit_entry
+                self._create_pii_audit_entry(request_id, text_data, pii_detected, pii_matches, 
+                                           scrubbed_text, strategy, scrubbing_summary, result, audit_level)
             
             return result
             

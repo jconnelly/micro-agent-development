@@ -325,6 +325,198 @@ class LegacyRuleExtractionAgent:
         self.logger.info(f"File chunked into {len(chunks)} chunks")
         return chunks
 
+    def _determine_processing_strategy(self, legacy_code_snippet: str) -> tuple[bool, int]:
+        """
+        Determine whether to use chunked processing or single-pass based on file size.
+        
+        Args:
+            legacy_code_snippet: The code to analyze
+            
+        Returns:
+            Tuple of (should_chunk, line_count)
+        """
+        line_count = len(legacy_code_snippet.split('\n'))
+        should_chunk = line_count > 175  # Threshold for chunking
+        return should_chunk, line_count
+    
+    def _process_file_chunks(self, legacy_code_snippet: str, context: Optional[str], request_id: str) -> tuple[List[Dict], int, int, str]:
+        """
+        Process large files using chunked approach with progress tracking.
+        
+        Returns:
+            Tuple of (extracted_rules, tokens_input, tokens_output, llm_response_raw)
+        """
+        chunks = self._chunk_large_file(legacy_code_snippet)
+        all_rules = []
+        total_tokens_input = 0
+        total_tokens_output = 0
+        chunk_start_time = time.time()
+        
+        self.logger.progress(f"Processing {len(chunks)} chunks...", request_id=request_id)
+        self.logger.progress("Press Ctrl+C at any time to cancel processing")
+        
+        for chunk_idx, chunk_content in enumerate(chunks):
+            # Progress tracking
+            self._create_progress_reporter(chunk_idx, len(chunks), chunk_start_time, request_id)
+            
+            # Check for timeout
+            elapsed_time = time.time() - chunk_start_time
+            if elapsed_time > self.TOTAL_OPERATION_TIMEOUT:
+                self.logger.warning(f"Total operation timeout ({self.TOTAL_OPERATION_TIMEOUT}s) exceeded. Stopping with partial results.", request_id=request_id)
+                break
+            
+            try:
+                chunk_rules, chunk_tokens_in, chunk_tokens_out = self._handle_chunk_processing(
+                    chunk_content, context, chunk_idx, request_id
+                )
+                
+                all_rules.extend(chunk_rules)
+                total_tokens_input += chunk_tokens_in
+                total_tokens_output += chunk_tokens_out
+                
+                self.logger.debug(f"Chunk {chunk_idx + 1} extracted {len(chunk_rules)} rules", request_id=request_id)
+                
+            except KeyboardInterrupt:
+                self.logger.warning(f"Processing interrupted by user. Returning partial results from {chunk_idx} chunks.", request_id=request_id)
+                break
+            except (json.JSONDecodeError, Exception) as e:
+                self._handle_chunk_error_recovery(chunk_idx, e, request_id)
+                continue
+        
+        # Final progress summary
+        total_time = time.time() - chunk_start_time
+        self._log_chunk_completion_summary(total_time, all_rules, chunks, request_id)
+        
+        llm_response_raw = f"Processed {len(chunks)} chunks, extracted {len(all_rules)} rules"
+        return all_rules, total_tokens_input, total_tokens_output, llm_response_raw
+    
+    def _process_single_file(self, legacy_code_snippet: str, context: Optional[str], request_id: str) -> tuple[List[Dict], int, int, str]:
+        """
+        Process small files using single-pass approach.
+        
+        Returns:
+            Tuple of (extracted_rules, tokens_input, tokens_output, llm_response_raw)
+        """
+        system_prompt, user_prompt = self._prepare_llm_prompt(legacy_code_snippet, context)
+        full_prompt = f"{system_prompt}\n\n{user_prompt}"
+        
+        response = self._api_call_with_retry(full_prompt)
+        llm_response_raw = response.text
+        
+        # Access token usage from usage_metadata
+        tokens_input = 0
+        tokens_output = 0
+        if response.usage_metadata:
+            tokens_input = response.usage_metadata.prompt_token_count
+            tokens_output = response.usage_metadata.candidates_token_count
+        else:
+            self.logger.warning(f"No usage_metadata found in Gemini response.", request_id=request_id)
+
+        # Parse the JSON response
+        response_data = json.loads(llm_response_raw)
+        extracted_rules = self._aggregate_chunk_results([response_data])
+        
+        return extracted_rules, tokens_input, tokens_output, llm_response_raw
+    
+    def _handle_chunk_processing(self, chunk_content: str, context: Optional[str], chunk_idx: int, request_id: str) -> tuple[List[Dict], int, int]:
+        """
+        Handle processing of a single chunk with rate limiting and error handling.
+        
+        Returns:
+            Tuple of (chunk_rules, tokens_input, tokens_output)
+        """
+        # Rate limiting: sleep before API call (except for first chunk)
+        if chunk_idx > 0:
+            time.sleep(self.API_DELAY_SECONDS)
+        
+        # Prepare prompt for this chunk
+        chunk_system_prompt, chunk_user_prompt = self._prepare_llm_prompt(chunk_content, context)
+        chunk_full_prompt = f"{chunk_system_prompt}\n\n{chunk_user_prompt}"
+        
+        # API call with retry logic
+        chunk_response = self._api_call_with_retry(chunk_full_prompt)
+        
+        # Parse chunk response
+        chunk_response_raw = chunk_response.text
+        chunk_response_data = json.loads(chunk_response_raw)
+        
+        # Handle different response formats and add chunk info to prevent duplicates
+        chunk_rules = self._aggregate_chunk_results([chunk_response_data])
+        for rule in chunk_rules:
+            if 'rule_id' in rule:
+                rule['rule_id'] = f"chunk{chunk_idx + 1}_{rule['rule_id']}"
+        
+        # Track tokens
+        tokens_input = 0
+        tokens_output = 0
+        if chunk_response.usage_metadata:
+            tokens_input = chunk_response.usage_metadata.prompt_token_count
+            tokens_output = chunk_response.usage_metadata.candidates_token_count
+        
+        return chunk_rules, tokens_input, tokens_output
+    
+    def _handle_chunk_error_recovery(self, chunk_idx: int, error: Exception, request_id: str) -> None:
+        """
+        Handle errors during chunk processing with appropriate logging.
+        """
+        if isinstance(error, json.JSONDecodeError):
+            self.logger.error(f"Chunk {chunk_idx + 1} JSON parse error", request_id=request_id, exception=error)
+        else:
+            self.logger.error(f"Chunk {chunk_idx + 1} processing error", request_id=request_id, exception=error)
+    
+    def _aggregate_chunk_results(self, response_data_list: List[Any]) -> List[Dict]:
+        """
+        Aggregate and normalize rule extraction results from chunks.
+        
+        Args:
+            response_data_list: List of response data from LLM calls
+            
+        Returns:
+            Consolidated list of extracted rules
+        """
+        all_rules = []
+        
+        for response_data in response_data_list:
+            # Handle different response formats from Gemini
+            if isinstance(response_data, dict) and 'business_rules' in response_data:
+                rules = response_data['business_rules']
+            elif isinstance(response_data, list):
+                rules = response_data
+            else:
+                rules = response_data if isinstance(response_data, list) else [response_data]
+            
+            if isinstance(rules, list):
+                all_rules.extend(rules)
+            else:
+                all_rules.append(rules)
+        
+        return all_rules
+    
+    def _create_progress_reporter(self, chunk_idx: int, total_chunks: int, start_time: float, request_id: str) -> None:
+        """
+        Create and log progress information for chunk processing.
+        """
+        progress_percent = (chunk_idx / total_chunks) * 100
+        elapsed_time = time.time() - start_time
+        
+        if chunk_idx > 0:
+            avg_time_per_chunk = elapsed_time / chunk_idx
+            estimated_remaining = avg_time_per_chunk * (total_chunks - chunk_idx)
+            self.logger.progress(f"Processing chunk {chunk_idx + 1}/{total_chunks} ({progress_percent:.1f}% complete)", request_id=request_id)
+            self.logger.progress(f"Estimated time remaining: {estimated_remaining:.1f} seconds", request_id=request_id)
+        else:
+            self.logger.progress(f"Processing chunk {chunk_idx + 1}/{total_chunks} (starting...)", request_id=request_id)
+    
+    def _log_chunk_completion_summary(self, total_time: float, all_rules: List[Dict], chunks: List[str], request_id: str) -> None:
+        """
+        Log completion summary for chunk processing.
+        """
+        self.logger.progress(f"Processing complete!", request_id=request_id)
+        self.logger.info(f"Total chunks processed: {len([r for r in all_rules if r])}", request_id=request_id)
+        self.logger.info(f"Total rules extracted: {len(all_rules)}", request_id=request_id)
+        self.logger.info(f"Total processing time: {total_time:.1f} seconds", request_id=request_id)
+        self.logger.info(f"Average time per chunk: {total_time / len(chunks):.1f} seconds", request_id=request_id)
+
     def extract_and_translate_rules(self, legacy_code_snippet: str, context: Optional[str] = None, audit_level: int = AuditLevel.LEVEL_1.value) -> Dict[str, Any]:
         """
         Extracts and translates business rules from a legacy code snippet using an LLM,
@@ -365,136 +557,23 @@ class LegacyRuleExtractionAgent:
             # Clear any previous session logs
             self.logger.clear_session_logs()
             
-            # Determine if chunking is needed based on file size
-            line_count = len(legacy_code_snippet.split('\n'))
-            if line_count > 175:  # Threshold for chunking
+            # Determine processing strategy
+            should_chunk, line_count = self._determine_processing_strategy(legacy_code_snippet)
+            
+            if should_chunk:
                 self.logger.info(f"Large file detected ({line_count} lines). Using chunked processing...", request_id=request_id)
-                chunks = self._chunk_large_file(legacy_code_snippet)
-                
-                # Process each chunk with progress tracking
-                all_rules = []
-                total_tokens_input = 0
-                total_tokens_output = 0
-                chunk_start_time = time.time()
-                
-                self.logger.progress(f"Processing {len(chunks)} chunks...", request_id=request_id)
-                self.logger.progress("Press Ctrl+C at any time to cancel processing")
-                
-                for chunk_idx, chunk_content in enumerate(chunks):
-                    # Progress indicator
-                    progress_percent = (chunk_idx / len(chunks)) * 100
-                    elapsed_time = time.time() - chunk_start_time
-                    
-                    if chunk_idx > 0:
-                        avg_time_per_chunk = elapsed_time / chunk_idx
-                        estimated_remaining = avg_time_per_chunk * (len(chunks) - chunk_idx)
-                        self.logger.progress(f"Processing chunk {chunk_idx + 1}/{len(chunks)} ({progress_percent:.1f}% complete)", request_id=request_id)
-                        self.logger.progress(f"Estimated time remaining: {estimated_remaining:.1f} seconds", request_id=request_id)
-                    else:
-                        self.logger.progress(f"Processing chunk {chunk_idx + 1}/{len(chunks)} (starting...)", request_id=request_id)
-                    
-                    # Check for timeout
-                    if elapsed_time > self.TOTAL_OPERATION_TIMEOUT:
-                        self.logger.warning(f"Total operation timeout ({self.TOTAL_OPERATION_TIMEOUT}s) exceeded. Stopping with partial results.", request_id=request_id)
-                        break
-                    
-                    # Prepare prompt for this chunk
-                    chunk_system_prompt, chunk_user_prompt = self._prepare_llm_prompt(chunk_content, context)
-                    chunk_full_prompt = f"{chunk_system_prompt}\n\n{chunk_user_prompt}"
-                    
-                    try:
-                        # Rate limiting: sleep before API call (except for first chunk)
-                        if chunk_idx > 0:
-                            time.sleep(self.API_DELAY_SECONDS)
-                        
-                        # API call with retry logic
-                        chunk_response = self._api_call_with_retry(chunk_full_prompt)
-                        
-                        # Parse chunk response
-                        chunk_response_raw = chunk_response.text
-                        chunk_response_data = json.loads(chunk_response_raw)
-                        
-                        # Handle different response formats
-                        if isinstance(chunk_response_data, dict) and 'business_rules' in chunk_response_data:
-                            chunk_rules = chunk_response_data['business_rules']
-                        elif isinstance(chunk_response_data, list):
-                            chunk_rules = chunk_response_data
-                        else:
-                            chunk_rules = chunk_response_data
-                        
-                        # Add chunk info to rule IDs to prevent duplicates
-                        for rule in chunk_rules:
-                            if 'rule_id' in rule:
-                                rule['rule_id'] = f"chunk{chunk_idx + 1}_{rule['rule_id']}"
-                        
-                        all_rules.extend(chunk_rules)
-                        
-                        # Track tokens
-                        if chunk_response.usage_metadata:
-                            total_tokens_input += chunk_response.usage_metadata.prompt_token_count
-                            total_tokens_output += chunk_response.usage_metadata.candidates_token_count
-                        
-                        self.logger.debug(f"Chunk {chunk_idx + 1} extracted {len(chunk_rules)} rules", request_id=request_id)
-                        
-                    except KeyboardInterrupt:
-                        self.logger.warning(f"Processing interrupted by user. Returning partial results from {chunk_idx} chunks.", request_id=request_id)
-                        break
-                        
-                    except json.JSONDecodeError as e:
-                        self.logger.error(f"Chunk {chunk_idx + 1} JSON parse error", request_id=request_id, exception=e)
-                        continue
-                    except Exception as e:
-                        self.logger.error(f"Chunk {chunk_idx + 1} processing error", request_id=request_id, exception=e)
-                        continue
-                
-                # Final progress summary
-                total_time = time.time() - chunk_start_time
-                self.logger.progress(f"Processing complete!", request_id=request_id)
-                self.logger.info(f"Total chunks processed: {len([r for r in all_rules if r])}", request_id=request_id)
-                self.logger.info(f"Total rules extracted: {len(all_rules)}", request_id=request_id)
-                self.logger.info(f"Total processing time: {total_time:.1f} seconds", request_id=request_id)
-                self.logger.info(f"Average time per chunk: {total_time / len(chunks):.1f} seconds", request_id=request_id)
-                
-                # Combine results
-                extracted_rules = all_rules
-                self.logger.debug(f"After assignment - all_rules length: {len(all_rules)}, extracted_rules length: {len(extracted_rules)}", request_id=request_id)
-                tokens_input = total_tokens_input
-                tokens_output = total_tokens_output
-                llm_response_raw = f"Processed {len(chunks)} chunks, extracted {len(extracted_rules)} rules"
-                
+                extracted_rules, tokens_input, tokens_output, llm_response_raw = self._process_file_chunks(
+                    legacy_code_snippet, context, request_id
+                )
             else:
                 self.logger.info(f"Small file ({line_count} lines). Using single-pass processing...", request_id=request_id)
-                
-                # --- SINGLE-PASS PROCESSING FOR SMALL FILES ---
-                system_prompt, user_prompt = self._prepare_llm_prompt(legacy_code_snippet, context)
-                full_prompt = f"{system_prompt}\n\n{user_prompt}"
-                
-                response = self._api_call_with_retry(full_prompt)
-
-                llm_response_raw = response.text
-                
-                # Access token usage from usage_metadata
-                if response.usage_metadata:
-                    tokens_input = response.usage_metadata.prompt_token_count
-                    tokens_output = response.usage_metadata.candidates_token_count
-                else:
-                    self.logger.warning(f"No usage_metadata found in Gemini response.", request_id=request_id)
-
-                # Attempt to parse the JSON response
-                response_data = json.loads(llm_response_raw)
-                
-                # Handle different response formats from Gemini
-                if isinstance(response_data, dict) and 'business_rules' in response_data:
-                    extracted_rules = response_data['business_rules']
-                elif isinstance(response_data, list):
-                    extracted_rules = response_data
-                else:
-                    extracted_rules = response_data
+                extracted_rules, tokens_input, tokens_output, llm_response_raw = self._process_single_file(
+                    legacy_code_snippet, context, request_id
+                )
 
         except json.JSONDecodeError as e:
             error_details = f"LLM response was not valid JSON: {e}. Raw response: {llm_response_raw}"
             self.logger.error(error_details, request_id=request_id, exception=e)
-            # Log processing state to audit trail
             self._log_exception_to_audit(request_id, e, "JSON_DECODE_ERROR", {
                 "raw_response": llm_response_raw[:500] if llm_response_raw else "None",
                 "tokens_processed": tokens_input + tokens_output,
@@ -503,7 +582,6 @@ class LegacyRuleExtractionAgent:
         except KeyboardInterrupt as e:
             error_details = f"Processing interrupted by user"
             self.logger.warning(error_details, request_id=request_id)
-            # Don't treat user interruption as an error in audit trail
             self._log_exception_to_audit(request_id, e, "USER_INTERRUPTION", {
                 "rules_extracted_before_interruption": len(extracted_rules),
                 "processing_stage": "rule_extraction"
@@ -530,7 +608,6 @@ class LegacyRuleExtractionAgent:
         duration_ms = (end_time - start_time).total_seconds() * 1000
 
         # 2. Call the AgentAuditing class after the LLM call
-        # Include logger session data in the audit
         logger_session_summary = self.logger.create_audit_summary(
             operation_name="rule_extraction",
             request_id=request_id,
