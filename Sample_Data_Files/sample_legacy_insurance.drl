@@ -1,0 +1,273 @@
+package com.insurance.underwriting.rules
+
+import com.insurance.model.PolicyApplication
+import com.insurance.model.Driver
+import com.insurance.model.Vehicle
+import com.insurance.model.Quote
+import java.util.Date
+import java.time.LocalDate
+import java.time.Period
+
+// Auto Insurance Underwriting Rules - Drools DRL Format
+
+rule "Minimum Age Requirement"
+    when
+        $app: PolicyApplication()
+        $driver: Driver(age < 16) from $app.drivers
+    then
+        $app.addRejectionReason("Driver must be at least 16 years old");
+        $app.setStatus("REJECTED");
+end
+
+rule "High Risk Age Groups - Young Drivers"
+    when
+        $app: PolicyApplication(status != "REJECTED")
+        $driver: Driver(age >= 16 && age <= 25) from $app.drivers
+        $quote: Quote() from $app.quote
+    then
+        $quote.addSurcharge("YOUNG_DRIVER", 0.25);
+        $quote.addNote("25% surcharge applied for drivers aged 16-25");
+end
+
+rule "High Risk Age Groups - Senior Drivers"
+    when
+        $app: PolicyApplication(status != "REJECTED")
+        $driver: Driver(age >= 75) from $app.drivers
+        $quote: Quote() from $app.quote
+    then
+        $quote.addSurcharge("SENIOR_DRIVER", 0.15);
+        $quote.addNote("15% surcharge applied for drivers aged 75+");
+end
+
+rule "DUI History Rejection"
+    when
+        $app: PolicyApplication()
+        $driver: Driver(duiCount > 0, duiMostRecent != null) from $app.drivers
+        eval(Period.between($driver.getDuiMostRecent().toLocalDate(), LocalDate.now()).getYears() < 3)
+    then
+        $app.addRejectionReason("DUI within last 3 years");
+        $app.setStatus("REJECTED");
+end
+
+rule "Multiple DUI Permanent Rejection"
+    when
+        $app: PolicyApplication()
+        $driver: Driver(duiCount >= 2) from $app.drivers
+    then
+        $app.addRejectionReason("Multiple DUI convictions - permanent rejection");
+        $app.setStatus("REJECTED");
+end
+
+rule "Excessive Violations"
+    when
+        $app: PolicyApplication()
+        $driver: Driver(movingViolations > 3) from $app.drivers
+    then
+        $app.addRejectionReason("More than 3 moving violations");
+        $app.setStatus("REJECTED");
+end
+
+rule "Recent Violations Surcharge"
+    when
+        $app: PolicyApplication(status != "REJECTED")
+        $driver: Driver(recentViolations >= 1 && recentViolations <= 3) from $app.drivers
+        $quote: Quote() from $app.quote
+    then
+        double surcharge = $driver.getRecentViolations() * 0.10;
+        $quote.addSurcharge("VIOLATIONS", surcharge);
+        $quote.addNote($driver.getRecentViolations() + " recent violations - " + (surcharge*100) + "% surcharge");
+end
+
+rule "Clean Driving Record Discount"
+    when
+        $app: PolicyApplication(status != "REJECTED")
+        $driver: Driver(movingViolations == 0, accidents == 0, duiCount == 0) from $app.drivers
+        $quote: Quote() from $app.quote
+    then
+        $quote.addDiscount("CLEAN_RECORD", 0.10);
+        $quote.addNote("10% clean driving record discount applied");
+end
+
+rule "Vehicle Age Surcharge"
+    when
+        $app: PolicyApplication(status != "REJECTED")
+        $vehicle: Vehicle(age > 15) from $app.vehicles
+        $quote: Quote() from $app.quote
+    then
+        $quote.addSurcharge("OLD_VEHICLE", 0.20);
+        $quote.addNote("20% surcharge for vehicles older than 15 years");
+end
+
+rule "Luxury Vehicle Surcharge"
+    when
+        $app: PolicyApplication(status != "REJECTED")
+        $vehicle: Vehicle(value > 75000) from $app.vehicles
+        $quote: Quote() from $app.quote
+    then
+        $quote.addSurcharge("LUXURY_VEHICLE", 0.30);
+        $quote.addNote("30% surcharge for luxury vehicles over $75,000");
+end
+
+rule "High Performance Vehicle Restriction"
+    when
+        $app: PolicyApplication()
+        $vehicle: Vehicle(horsepower > 400 || engineSize > 5.0) from $app.vehicles
+        $driver: Driver(age < 25) from $app.drivers
+    then
+        $app.addRejectionReason("High performance vehicle with young driver");
+        $app.setStatus("REJECTED");
+end
+
+rule "Multi-Vehicle Discount"
+    when
+        $app: PolicyApplication(status != "REJECTED")
+        eval($app.getVehicles().size() >= 2)
+        $quote: Quote() from $app.quote
+    then
+        double discount = Math.min(0.20, $app.getVehicles().size() * 0.05);
+        $quote.addDiscount("MULTI_VEHICLE", discount);
+        $quote.addNote("Multi-vehicle discount: " + (discount*100) + "%");
+end
+
+rule "Good Student Discount"
+    when
+        $app: PolicyApplication(status != "REJECTED")
+        $driver: Driver(age >= 16 && age <= 25, studentStatus == "GOOD_STUDENT") from $app.drivers
+        $quote: Quote() from $app.quote
+    then
+        $quote.addDiscount("GOOD_STUDENT", 0.15);
+        $quote.addNote("15% good student discount applied");
+end
+
+rule "Married Couple Discount"
+    when
+        $app: PolicyApplication(status != "REJECTED")
+        eval($app.getDrivers().size() == 2)
+        exists(Driver(maritalStatus == "MARRIED") from $app.drivers)
+        not(Driver(maritalStatus != "MARRIED") from $app.drivers)
+        $quote: Quote() from $app.quote
+    then
+        $quote.addDiscount("MARRIED_COUPLE", 0.08);
+        $quote.addNote("8% married couple discount applied");
+end
+
+rule "Prior Insurance Discount"
+    when
+        $app: PolicyApplication(status != "REJECTED")
+        $app: PolicyApplication(priorInsuranceYears >= 3)
+        $quote: Quote() from $app.quote
+    then
+        double discount = Math.min(0.15, $app.getPriorInsuranceYears() * 0.02);
+        $quote.addDiscount("PRIOR_INSURANCE", discount);
+        $quote.addNote("Prior insurance discount: " + (discount*100) + "%");
+end
+
+rule "Anti-Theft Device Discount"
+    when
+        $app: PolicyApplication(status != "REJECTED")
+        $vehicle: Vehicle(hasAntiTheft == true) from $app.vehicles
+        $quote: Quote() from $app.quote
+    then
+        $quote.addDiscount("ANTI_THEFT", 0.05);
+        $quote.addNote("5% anti-theft device discount applied");
+end
+
+rule "Safety Features Discount"
+    when
+        $app: PolicyApplication(status != "REJECTED")
+        $vehicle: Vehicle(safetyRating >= 4) from $app.vehicles
+        $quote: Quote() from $app.quote
+    then
+        $quote.addDiscount("SAFETY_FEATURES", 0.10);
+        $quote.addNote("10% safety features discount for " + $vehicle.safetyRating + "-star rating");
+end
+
+rule "Geographic Risk - High Crime Area"
+    when
+        $app: PolicyApplication(status != "REJECTED")
+        $app: PolicyApplication(zipCode matches "^(90210|10001|60601).*")  // High crime zip codes
+        $quote: Quote() from $app.quote
+    then
+        $quote.addSurcharge("HIGH_CRIME_AREA", 0.18);
+        $quote.addNote("18% surcharge for high crime area");
+end
+
+rule "Rural Area Discount"
+    when
+        $app: PolicyApplication(status != "REJECTED")
+        $app: PolicyApplication(populationDensity < 500)  // Low population density
+        $quote: Quote() from $app.quote
+    then
+        $quote.addDiscount("RURAL_AREA", 0.12);
+        $quote.addNote("12% rural area discount applied");
+end
+
+rule "Bundle Policy Discount"
+    when
+        $app: PolicyApplication(status != "REJECTED")
+        $app: PolicyApplication(hasBundledPolicies == true)
+        $quote: Quote() from $app.quote
+    then
+        $quote.addDiscount("BUNDLE", 0.20);
+        $quote.addNote("20% bundle discount for multiple policy types");
+end
+
+rule "Credit Score Impact - Excellent"
+    when
+        $app: PolicyApplication(status != "REJECTED")
+        $app: PolicyApplication(creditScore >= 800)
+        $quote: Quote() from $app.quote
+    then
+        $quote.addDiscount("EXCELLENT_CREDIT", 0.12);
+        $quote.addNote("12% discount for excellent credit score");
+end
+
+rule "Credit Score Impact - Poor"
+    when
+        $app: PolicyApplication(status != "REJECTED")
+        $app: PolicyApplication(creditScore < 600)
+        $quote: Quote() from $app.quote
+    then
+        $quote.addSurcharge("POOR_CREDIT", 0.25);
+        $quote.addNote("25% surcharge for poor credit score");
+end
+
+rule "Annual Mileage - Low Mileage Discount"
+    when
+        $app: PolicyApplication(status != "REJECTED")
+        $app: PolicyApplication(annualMileage < 7500)
+        $quote: Quote() from $app.quote
+    then
+        $quote.addDiscount("LOW_MILEAGE", 0.08);
+        $quote.addNote("8% low mileage discount for under 7,500 miles/year");
+end
+
+rule "Annual Mileage - High Mileage Surcharge"
+    when
+        $app: PolicyApplication(status != "REJECTED")
+        $app: PolicyApplication(annualMileage > 25000)
+        $quote: Quote() from $app.quote
+    then
+        $quote.addSurcharge("HIGH_MILEAGE", 0.15);
+        $quote.addNote("15% surcharge for over 25,000 miles/year");
+end
+
+rule "Loyalty Customer Discount"
+    when
+        $app: PolicyApplication(status != "REJECTED")
+        $app: PolicyApplication(customerTenure >= 5)
+        $quote: Quote() from $app.quote
+    then
+        double discount = Math.min(0.20, $app.getCustomerTenure() * 0.02);
+        $quote.addDiscount("LOYALTY", discount);
+        $quote.addNote("Loyalty discount: " + (discount*100) + "% for " + $app.getCustomerTenure() + " years");
+end
+
+rule "Calculate Final Premium"
+    when
+        $app: PolicyApplication(status != "REJECTED")
+        $quote: Quote(finalPremium == 0) from $app.quote
+    then
+        $quote.calculateFinalPremium();
+        $quote.addNote("Final premium calculated with all applicable discounts and surcharges");
+end

@@ -1,0 +1,87 @@
+{
+  "sector": "government",
+  "description": "Government service applications including permits, licenses, benefits, and regulatory filings",
+  "submissions": [
+    {
+      "id": "GOV-2024-001",
+      "type": "Business License Application",
+      "content": "Application for general business license. Business: Tech Solutions LLC, owner: Amanda Rodriguez, SSN: 777-88-9999, phone: (555) 678-9012, email: a.rodriguez@techsolutions.com. Business address: 789 Innovation Drive, Austin, TX 78701. Business type: IT consulting services. Employees: 5. Annual revenue projected: $250,000.",
+      "summary": "Business license application - IT consulting - 5 employees",
+      "user_context": {
+        "business_name": "Tech Solutions LLC",
+        "business_type": "IT consulting services",
+        "employee_count": 5,
+        "annual_revenue_projected": 250000,
+        "business_address": "789 Innovation Drive, Austin, TX 78701",
+        "owner_ssn": "777-88-9999",
+        "phone": "(555) 678-9012",
+        "email": "a.rodriguez@techsolutions.com"
+      },
+      "user_id": "biz_license_001",
+      "session_id": "gov_session_001",
+      "ip_address": "203.0.113.50"
+    },
+    {
+      "id": "GOV-2024-002",
+      "type": "Building Permit Application",
+      "content": "Residential building permit application for home addition. Property owner: Thomas Wilson, SSN: 888-99-0000, phone: (555) 789-0123, email: t.wilson@email.com. Property address: 321 Elm Street, Denver, CO 80202. Project: 500 sq ft master bedroom addition. Contractor: Denver Builders Inc, license #CB12345. Estimated cost: $75,000.",
+      "summary": "Building permit - Home addition - 500 sq ft - $75K",
+      "user_context": {
+        "project_type": "home_addition",
+        "addition_size_sqft": 500,
+        "estimated_cost": 75000,
+        "contractor": "Denver Builders Inc",
+        "contractor_license": "CB12345",
+        "property_address": "321 Elm Street, Denver, CO 80202",
+        "ssn": "888-99-0000",
+        "phone": "(555) 789-0123",
+        "email": "t.wilson@email.com"
+      },
+      "user_id": "permit_001",
+      "session_id": "permit_session_001",
+      "ip_address": "198.51.100.60"
+    },
+    {
+      "id": "GOV-2024-003",
+      "type": "Social Security Benefits Application",
+      "content": "Application for Social Security disability benefits. Applicant: Linda Thompson, age 58, unable to work due to chronic back injury. SSN: 999-00-1111, phone: (555) 890-1234, email: l.thompson@email.com. Date of birth: 11/30/1965. Last employment: factory worker, stopped working 06/2023. Medical documentation provided from Dr. Smith, Orthopedic Specialist.",
+      "summary": "SS Disability benefits - Chronic back injury - Factory worker",
+      "user_context": {
+        "age": 58,
+        "disability_type": "chronic_back_injury",
+        "last_occupation": "factory_worker",
+        "work_stop_date": "06/2023",
+        "medical_provider": "Dr. Smith, Orthopedic Specialist",
+        "medical_documentation": true,
+        "ssn": "999-00-1111",
+        "phone": "(555) 890-1234",
+        "email": "l.thompson@email.com",
+        "date_of_birth": "11/30/1965"
+      },
+      "user_id": "benefits_001",
+      "session_id": "benefits_session_001",
+      "ip_address": "192.0.2.70"
+    },
+    {
+      "id": "GOV-2024-004",
+      "type": "Professional License Renewal",
+      "content": "Professional license renewal for registered nurse. Licensee: Dr. Karen White, RN license #RN123456, SSN: 111-00-2222, phone: (555) 901-2345, email: k.white@hospital.com. Date of birth: 05/10/1980. Continuing education credits: 40 hours completed. Employment: City General Hospital, Nursing Supervisor. No disciplinary actions.",
+      "summary": "RN license renewal - 40 CE hours - Hospital supervisor",
+      "user_context": {
+        "license_type": "registered_nurse",
+        "license_number": "RN123456",
+        "continuing_education_hours": 40,
+        "current_employer": "City General Hospital",
+        "position": "Nursing Supervisor",
+        "disciplinary_actions": false,
+        "ssn": "111-00-2222",
+        "phone": "(555) 901-2345",
+        "email": "k.white@hospital.com",
+        "date_of_birth": "05/10/1980"
+      },
+      "user_id": "license_001",
+      "session_id": "license_session_001",
+      "ip_address": "203.0.113.80"
+    }
+  ]
+}

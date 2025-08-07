@@ -1,0 +1,98 @@
+{
+  "sector": "insurance",
+  "description": "Insurance applications including auto, health, life, and property insurance",
+  "submissions": [
+    {
+      "id": "INS-2024-001",
+      "type": "Auto Insurance Application",
+      "content": "Auto insurance application for 2023 Honda Civic. Driver: Jennifer Lopez, age 28, clean driving record for 10 years. SSN: 222-33-4444, phone: (555) 234-5678, email: j.lopez@email.com. Vehicle VIN: 1HGBH41JXMN109186. Coverage requested: full coverage with $500 deductible. Previous insurance with State Farm, no claims in 5 years.",
+      "summary": "Auto insurance - 2023 Honda Civic - Full coverage",
+      "user_context": {
+        "driver_age": 28,
+        "driving_record_years": 10,
+        "vehicle_year": 2023,
+        "vehicle_make": "Honda",
+        "vehicle_model": "Civic",
+        "vin": "1HGBH41JXMN109186",
+        "coverage_type": "full",
+        "deductible": 500,
+        "previous_insurer": "State Farm",
+        "claims_history_years": 5,
+        "ssn": "222-33-4444",
+        "phone": "(555) 234-5678",
+        "email": "j.lopez@email.com"
+      },
+      "user_id": "driver_001",
+      "session_id": "auto_session_001",
+      "ip_address": "198.51.100.10"
+    },
+    {
+      "id": "INS-2024-002",
+      "type": "Health Insurance Application",
+      "content": "Individual health insurance application. Applicant: Robert Johnson, age 35, non-smoker, no pre-existing conditions. SSN: 333-44-5555, phone: (555) 345-6789, email: r.johnson@email.com. Date of birth: 03/15/1989. Occupation: teacher. Family size: 4 (spouse + 2 children). Preferred plan: Gold tier with $2,500 deductible.",
+      "summary": "Individual health insurance - Gold tier - Family of 4",
+      "user_context": {
+        "age": 35,
+        "smoker_status": false,
+        "pre_existing_conditions": false,
+        "occupation": "teacher",
+        "family_size": 4,
+        "dependents": ["spouse", "child1", "child2"],
+        "plan_tier": "gold",
+        "deductible": 2500,
+        "ssn": "333-44-5555",
+        "phone": "(555) 345-6789",
+        "email": "r.johnson@email.com",
+        "date_of_birth": "03/15/1989"
+      },
+      "user_id": "health_001",
+      "session_id": "health_session_001",
+      "ip_address": "203.0.113.25"
+    },
+    {
+      "id": "INS-2024-003",
+      "type": "Life Insurance Application",
+      "content": "Term life insurance application. Applicant: Maria Garcia, age 42, non-smoker, excellent health. SSN: 444-55-6666, phone: (555) 456-7890, email: m.garcia@email.com. Date of birth: 08/22/1982. Occupation: engineer. Coverage amount: $500,000, term: 20 years. Beneficiary: spouse Carlos Garcia. Medical exam required.",
+      "summary": "Term life insurance - $500K - 20 years",
+      "user_context": {
+        "age": 42,
+        "smoker_status": false,
+        "health_status": "excellent",
+        "occupation": "engineer",
+        "coverage_amount": 500000,
+        "term_years": 20,
+        "beneficiary": "Carlos Garcia",
+        "medical_exam_required": true,
+        "ssn": "444-55-6666",
+        "phone": "(555) 456-7890",
+        "email": "m.garcia@email.com",
+        "date_of_birth": "08/22/1982"
+      },
+      "user_id": "life_001",
+      "session_id": "life_session_001",
+      "ip_address": "192.0.2.30"
+    },
+    {
+      "id": "INS-2024-004",
+      "type": "Homeowners Insurance Application",
+      "content": "Homeowners insurance application for single-family home. Property owner: David Kim, SSN: 666-77-8888, phone: (555) 567-8901, email: d.kim@email.com. Property address: 456 Oak Street, Springfield, IL 62701. Home value: $350,000, built in 1995. Coverage requested: $300,000 dwelling, $150,000 personal property. No previous claims. Security system installed.",
+      "summary": "Homeowners insurance - $350K home value - Full coverage",
+      "user_context": {
+        "property_type": "single_family_home",
+        "home_value": 350000,
+        "year_built": 1995,
+        "dwelling_coverage": 300000,
+        "personal_property_coverage": 150000,
+        "previous_claims": false,
+        "security_system": true,
+        "property_address": "456 Oak Street, Springfield, IL 62701",
+        "ssn": "666-77-8888",
+        "phone": "(555) 567-8901",
+        "email": "d.kim@email.com"
+      },
+      "user_id": "home_001",
+      "session_id": "home_session_001",
+      "ip_address": "198.51.100.40"
+    }
+  ]
+}

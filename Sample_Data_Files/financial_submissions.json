@@ -1,0 +1,91 @@
+{
+  "sector": "financial",
+  "description": "Financial services submissions including loans, credit cards, mortgages, and banking applications",
+  "submissions": [
+    {
+      "id": "FIN-2024-001",
+      "type": "Personal Loan Application",
+      "content": "Personal loan request for $25,000 for debt consolidation. Applicant John Smith has steady employment for 3 years as software engineer, credit score 680, annual income $65,000. SSN: 123-45-6789, phone: (555) 123-4567, email: john.smith@email.com. Credit card on file: 4532-1234-5678-9012. No previous defaults or bankruptcies.",
+      "summary": "Personal loan for debt consolidation - $25K",
+      "user_context": {
+        "credit_score": 680,
+        "annual_income": 65000,
+        "employment_years": 3,
+        "loan_purpose": "debt_consolidation",
+        "requested_amount": 25000,
+        "ssn": "123-45-6789",
+        "credit_card": "4532-1234-5678-9012",
+        "phone": "(555) 123-4567",
+        "email": "john.smith@email.com"
+      },
+      "user_id": "user_12345",
+      "session_id": "session_abc123",
+      "ip_address": "192.168.1.100"
+    },
+    {
+      "id": "FIN-2024-002",
+      "type": "Business Credit Card Application",
+      "content": "Business credit card application for new startup tech company. Company founded 6 months ago, monthly revenue $8,000, seeking $15,000 credit limit. Owner: Sarah Johnson, SSN: 987-65-4321, business phone: 555.987.6543, email: sarah@techstartup.com. Bank account: 123456789012345, routing: 021000021.",
+      "summary": "Business credit card for startup - $15K limit",
+      "user_context": {
+        "business_age_months": 6,
+        "monthly_revenue": 8000,
+        "requested_limit": 15000,
+        "business_type": "startup",
+        "industry": "technology",
+        "owner_ssn": "987-65-4321",
+        "business_phone": "555.987.6543",
+        "email": "sarah@techstartup.com",
+        "bank_account": "123456789012345",
+        "routing_number": "021000021"
+      },
+      "user_id": "biz_user_67890",
+      "session_id": "session_def456",
+      "ip_address": "10.0.0.50"
+    },
+    {
+      "id": "FIN-2024-003",
+      "type": "Home Mortgage Application",
+      "content": "Home mortgage application for $450,000. First-time homebuyer Michael Chen, excellent credit score 780, stable employment as software engineer for 5 years, annual income $120,000. SSN: 111-22-3333, phone: (555) 555-1234, email: m.chen@email.com. Down payment: $90,000 (20%). Property address: 123 Main Street, Anytown, CA 90210.",
+      "summary": "First-time homebuyer mortgage - $450K",
+      "user_context": {
+        "credit_score": 780,
+        "annual_income": 120000,
+        "employment_years": 5,
+        "loan_amount": 450000,
+        "property_type": "primary_residence",
+        "first_time_buyer": true,
+        "down_payment": 90000,
+        "ssn": "111-22-3333",
+        "phone": "(555) 555-1234",
+        "email": "m.chen@email.com",
+        "property_address": "123 Main Street, Anytown, CA 90210"
+      },
+      "user_id": "user_54321",
+      "session_id": "session_ghi789",
+      "ip_address": "172.16.0.25"
+    },
+    {
+      "id": "FIN-2024-004",
+      "type": "Investment Account Opening",
+      "content": "Opening investment account for retirement planning. Client: Dr. Patricia Williams, age 45, annual income $180,000, investment goal: retirement in 20 years. SSN: 555-66-7777, phone: (555) 987-6543, email: p.williams@medical.com. Initial deposit: $50,000. Risk tolerance: moderate. Account type: IRA.",
+      "summary": "Investment account opening - IRA - $50K initial",
+      "user_context": {
+        "age": 45,
+        "annual_income": 180000,
+        "investment_goal": "retirement",
+        "time_horizon_years": 20,
+        "initial_deposit": 50000,
+        "risk_tolerance": "moderate",
+        "account_type": "IRA",
+        "ssn": "555-66-7777",
+        "phone": "(555) 987-6543",
+        "email": "p.williams@medical.com",
+        "occupation": "physician"
+      },
+      "user_id": "user_invest_001",
+      "session_id": "session_invest_123",
+      "ip_address": "192.168.10.15"
+    }
+  ]
+}

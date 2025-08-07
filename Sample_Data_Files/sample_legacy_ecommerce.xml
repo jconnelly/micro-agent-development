@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- OFBiz Business Rules Configuration - E-commerce Order Management -->
+<!-- Contains business rules for pricing, promotions, inventory, and order processing -->
+
+<entity-engine-xml>
+    <!-- Product Pricing Rules -->
+    <ProductPriceRule productPriceRuleId="BULK_DISCOUNT_10" ruleName="10% Bulk Discount">
+        <description>Apply 10% discount for orders over 10 units of same product</description>
+        <fromDate>2020-01-01 00:00:00.000</fromDate>
+        <isSale>Y</isSale>
+    </ProductPriceRule>
+    
+    <ProductPriceCondition productPriceRuleId="BULK_DISCOUNT_10" productPriceCondSeqId="01"
+                          inputParamEnumId="PPIP_QUANTITY" operatorEnumId="PPC_GTE" condValue="10"/>
+    
+    <ProductPriceAction productPriceRuleId="BULK_DISCOUNT_10" productPriceActionSeqId="01"
+                       productPriceActionTypeId="PRICE_POF" amount="-10.00"/>
+    
+    <!-- Customer Loyalty Pricing -->
+    <ProductPriceRule productPriceRuleId="LOYALTY_GOLD" ruleName="Gold Member 15% Discount">
+        <description>15% discount for Gold loyalty tier customers</description>
+        <fromDate>2020-01-01 00:00:00.000</fromDate>
+        <isSale>Y</isSale>
+    </ProductPriceRule>
+    
+    <ProductPriceCondition productPriceRuleId="LOYALTY_GOLD" productPriceCondSeqId="01"
+                          inputParamEnumId="PPIP_PARTY_CLASS" operatorEnumId="PPC_EQ" condValue="GOLD_MEMBER"/>
+    
+    <ProductPriceAction productPriceRuleId="LOYALTY_GOLD" productPriceActionSeqId="01"
+                       productPriceActionTypeId="PRICE_POF" amount="-15.00"/>
+    
+    <!-- Seasonal Promotions -->
+    <ProductPriceRule productPriceRuleId="SUMMER_SALE" ruleName="Summer Electronics Sale">
+        <description>20% off electronics during summer months (June-August)</description>
+        <fromDate>2024-06-01 00:00:00.000</fromDate>
+        <thruDate>2024-08-31 23:59:59.999</thruDate>
+        <isSale>Y</isSale>
+    </ProductPriceRule>
+    
+    <ProductPriceCondition productPriceRuleId="SUMMER_SALE" productPriceCondSeqId="01"
+                          inputParamEnumId="PPIP_PRODUCT_CATEGORY" operatorEnumId="PPC_EQ" condValue="ELECTRONICS"/>
+    
+    <ProductPriceAction productPriceRuleId="SUMMER_SALE" productPriceActionSeqId="01"
+                       productPriceActionTypeId="PRICE_POF" amount="-20.00"/>
+    
+    <!-- Free Shipping Rules -->
+    <ShippingMethodTypeRule shippingMethodTypeId="FREE_SHIPPING" ruleName="Free Shipping Over $75">
+        <description>Free standard shipping for orders over $75</description>
+        <minWeight>0.00</minWeight>
+        <maxWeight>999.00</maxWeight>
+        <minSize>0.00</minSize>
+        <maxSize>999.00</maxSize>
+        <minPrice>75.01</minPrice>
+        <maxPrice>999999.99</maxPrice>
+    </ShippingMethodTypeRule>
+    
+    <!-- Payment Processing Rules -->
+    <PaymentMethodTypeRule paymentMethodTypeId="CREDIT_CARD" ruleName="Credit Card Processing">
+        <description>Standard credit card processing rules and validations</description>
+        <minAmount>1.00</minAmount>
+        <maxAmount>5000.00</maxAmount>
+        <requireCvv>Y</requireCvv>
+        <requireAvsMatch>Y</requireAvsMatch>
+    </PaymentMethodTypeRule>
+    
+    <!-- Order Processing Workflow Rules -->
+    <WorkflowActivityDefinition workflowId="ORDER_PROCESSING" activityId="INVENTORY_CHECK">
+        <activityName>Inventory Availability Check</activityName>
+        <description>Verify all order items are in stock before processing</description>
+        <canStart>Y</canStart>
+        <toolId>INVENTORY_SERVICE</toolId>
+        <subFlowId>INV_CHECK_WORKFLOW</subFlowId>
+    </WorkflowActivityDefinition>
+    
+    <WorkflowActivityDefinition workflowId="ORDER_PROCESSING" activityId="CREDIT_CHECK">
+        <activityName>Customer Credit Verification</activityName>
+        <description>Verify customer payment method and credit limits</description>
+        <canStart>Y</canStart>
+        <toolId>PAYMENT_SERVICE</toolId>
+        <limitAfterStart>3600</limitAfterStart> <!-- 1 hour limit -->
+    </WorkflowActivityDefinition>
+    
+    <!-- Customer Segmentation Rules -->
+    <PartyClassificationGroup partyClassificationGroupId="HIGH_VALUE_CUSTOMER">
+        <description>Customers with annual purchases over $2000</description>
+        <partyClassificationTypeId>PURCHASE_BEHAVIOR</partyClassificationTypeId>
+    </PartyClassificationGroup>
+    
+    <PartyClassificationRule partyClassificationGroupId="HIGH_VALUE_CUSTOMER" ruleSeqId="01">
+        <conditionTypeId>ANNUAL_PURCHASE_AMOUNT</conditionTypeId>
+        <conditionOperator>GREATER_THAN</conditionOperator>
+        <conditionValue>2000.00</conditionValue>
+    </PartyClassificationRule>
+    
+    <!-- Return and Refund Policy Rules -->
+    <ReturnPolicyRule returnPolicyId="STANDARD_30DAY" ruleSeqId="01">
+        <description>Standard 30-day return policy for most items</description>
+        <returnDays>30</returnDays>
+        <restockingFee>0.00</restockingFee>
+        <requiresOriginalPackaging>Y</requiresOriginalPackaging>
+        <allowsUsedReturns>N</allowsUsedReturns>
+    </ReturnPolicyRule>
+    
+    <ReturnPolicyRule returnPolicyId="ELECTRONICS_15DAY" ruleSeqId="01">
+        <description>15-day return policy for electronics with 10% restocking fee</description>
+        <productCategoryId>ELECTRONICS</productCategoryId>
+        <returnDays>15</returnDays>
+        <restockingFee>10.00</restockingFee>
+        <requiresOriginalPackaging>Y</requiresOriginalPackaging>
+        <allowsUsedReturns>N</allowsUsedReturns>
+    </ReturnPolicyRule>
+    
+    <ReturnPolicyRule returnPolicyId="PERISHABLE_NO_RETURN" ruleSeqId="01">
+        <description>No returns allowed for perishable items</description>
+        <productCategoryId>PERISHABLE</productCategoryId>
+        <returnDays>0</returnDays>
+        <allowsReturns>N</allowsReturns>
+    </ReturnPolicyRule>
+    
+    <!-- Inventory Management Rules -->
+    <ProductInventoryRule productId="*" facilityId="MAIN_WAREHOUSE" ruleSeqId="01">
+        <description>Automatic reorder when inventory falls below safety stock</description>
+        <minimumStock>50.00</minimumStock>
+        <reorderQuantity>200.00</reorderQuantity>
+        <daysToShip>7</daysToShip>
+        <autoCreatePurchaseOrder>Y</autoCreatePurchaseOrder>
+    </ProductInventoryRule>
+    
+    <ProductInventoryRule productCategoryId="SEASONAL" facilityId="MAIN_WAREHOUSE" ruleSeqId="01">
+        <description>Higher safety stock for seasonal items during peak season</description>
+        <minimumStock>100.00</minimumStock>
+        <reorderQuantity>500.00</reorderQuantity>
+        <seasonalMultiplier>2.0</seasonalMultiplier>
+        <peakSeasonStart>11-01</peakSeasonStart> <!-- November 1st -->
+        <peakSeasonEnd>01-15</peakSeasonEnd>     <!-- January 15th -->
+    </ProductInventoryRule>
+    
+    <!-- Product Catalog Rules -->
+    <ProductCatalogRule prodCatalogId="DEFAULT_CATALOG" ruleSeqId="01">
+        <description>Hide out-of-stock items from catalog display</description>
+        <hideOutOfStock>Y</hideOutOfStock>
+        <showBackorderItems>Y</showBackorderItems>
+        <estimatedBackorderDays>14</estimatedBackorderDays>
+    </ProductCatalogRule>
+    
+    <!-- Tax Calculation Rules -->
+    <TaxAuthority taxAuthGeoId="USA" taxAuthPartyId="USA_IRS">
+        <description>United States Federal Tax Authority</description>
+        <includeTaxInPrice>N</includeTaxInPrice>
+        <requireTaxIdForExemption>Y</requireTaxIdForExemption>
+    </TaxAuthority>
+    
+    <TaxAuthorityRule taxAuthGeoId="USA_CA" taxAuthPartyId="CA_BOE" ruleSeqId="01">
+        <description>California state sales tax - 7.25% base rate</description>
+        <taxRate>7.25</taxRate>
+        <exemptionTypeId>RESALE_CERTIFICATE</exemptionTypeId>
+        <minPurchaseAmount>0.00</minPurchaseAmount>
+        <applyToShipping>N</applyToShipping>
+    </TaxAuthorityRule>
+    
+    <!-- Customer Service Rules -->
+    <CommunicationEventRule communicationEventTypeId="CUSTOMER_COMPLAINT" ruleSeqId="01">
+        <description>High priority routing for customer complaints</description>
+        <priorityLevel>HIGH</priorityLevel>
+        <autoAssignToTeam>CUSTOMER_SERVICE</autoAssignToTeam>
+        <responseTimeLimit>24</responseTimeLimit> <!-- Hours -->
+        <escalationTimeLimit>72</escalationTimeLimit>
+    </CommunicationEventRule>
+    
+    <!-- Fraud Detection Rules -->
+    <OrderValidationRule orderValidationTypeId="FRAUD_CHECK" ruleSeqId="01">
+        <description>Flag orders with mismatched billing and shipping addresses in different countries</description>
+        <conditionTypeId>ADDRESS_COUNTRY_MISMATCH</conditionTypeId>
+        <actionTypeId>FLAG_FOR_REVIEW</actionTypeId>
+        <requireManualReview>Y</requireManualReview>
+    </OrderValidationRule>
+    
+    <OrderValidationRule orderValidationTypeId="FRAUD_CHECK" ruleSeqId="02">
+        <description>Flag high-value orders from new customers</description>
+        <conditionTypeId>HIGH_VALUE_NEW_CUSTOMER</conditionTypeId>
+        <conditionValue>500.00</conditionValue>
+        <customerHistoryDays>30</customerHistoryDays>
+        <actionTypeId>REQUIRE_ADDITIONAL_VERIFICATION</actionTypeId>
+    </OrderValidationRule>
+    
+    <!-- Supplier Management Rules -->
+    <SupplierRule partyId="SUPPLIER_001" ruleSeqId="01">
+        <description>Primary supplier with 5-day lead time and quantity discounts</description>
+        <leadTimeDays>5</leadTimeDays>
+        <minimumOrderQuantity>50.00</minimumOrderQuantity>
+        <quantityBreak1>100.00</quantityBreak1>
+        <discount1>5.00</discount1>
+        <quantityBreak2>500.00</quantityBreak2>
+        <discount2>10.00</discount2>
+        <quantityBreak3>1000.00</quantityBreak3>
+        <discount3>15.00</discount3>
+    </SupplierRule>
+    
+    <!-- Marketing Campaign Rules -->
+    <MarketingCampaignRule marketingCampaignId="EMAIL_ABANDONED_CART" ruleSeqId="01">
+        <description>Send email to customers who abandoned cart after 24 hours</description>
+        <triggerCondition>CART_ABANDONED</triggerCondition>
+        <triggerDelayHours>24</triggerDelayHours>
+        <maxAttempts>3</maxAttempts>
+        <attemptIntervalHours>72</attemptIntervalHours>
+        <requireOptIn>Y</requireOptIn>
+    </MarketingCampaignRule>
+    
+    <MarketingCampaignRule marketingCampaignId="REORDER_REMINDER" ruleSeqId="01">
+        <description>Send reorder reminders for consumable products based on purchase history</description>
+        <productCategoryId>CONSUMABLE</productCategoryId>
+        <triggerCondition>ESTIMATED_DEPLETION</triggerCondition>
+        <triggerDaysBefore>7</triggerDaysBefore>
+        <offerDiscount>5.00</offerDiscount>
+        <maxReminders>2</maxReminders>
+    </MarketingCampaignRule>
+    
+    <!-- Quality Assurance Rules -->
+    <QualityRule productCategoryId="ELECTRONICS" ruleSeqId="01">
+        <description>Mandatory quality inspection for all electronics before shipping</description>
+        <requiresInspection>Y</requiresInspection>
+        <inspectionCheckpoints>VISUAL_INSPECTION,FUNCTIONAL_TEST,PACKAGING_CHECK</inspectionCheckpoints>
+        <maxDefectRate>2.0</maxDefectRate>
+        <quarantineIfExceeded>Y</quarantineIfExceeded>
+    </QualityRule>
+    
+    <!-- Customer Loyalty Program Rules -->
+    <LoyaltyProgramRule loyaltyProgramId="POINTS_PROGRAM" ruleSeqId="01">
+        <description>Standard points earning - 1 point per dollar spent</description>
+        <pointsPerDollar>1.0</pointsPerDollar>
+        <minimumPurchase>1.00</minimumPurchase>
+        <excludeShippingFromPoints>Y</excludeShippingFromPoints>
+        <excludeTaxFromPoints>Y</excludeTaxFromPoints>
+    </LoyaltyProgramRule>
+    
+    <LoyaltyProgramRule loyaltyProgramId="POINTS_PROGRAM" ruleSeqId="02">
+        <description>Bonus points for electronics category - 2 points per dollar</description>
+        <productCategoryId>ELECTRONICS</productCategoryId>
+        <pointsPerDollar>2.0</pointsPerDollar>
+        <bonusPointsValidDays>365</bonusPointsValidDays>
+    </LoyaltyProgramRule>
+    
+    <!-- Order Processing Automation Rules -->
+    <OrderProcessingRule orderTypeId="SALES_ORDER" ruleSeqId="01">
+        <description>Auto-approve orders under $100 from verified customers</description>
+        <conditionTypeId>ORDER_TOTAL_LESS_THAN</conditionTypeId>
+        <conditionValue>100.00</conditionValue>
+        <customerVerificationRequired>Y</customerVerificationRequired>
+        <autoApprove>Y</autoApprove>
+        <autoShip>Y</autoShip>
+    </OrderProcessingRule>
+    
+    <OrderProcessingRule orderTypeId="SALES_ORDER" ruleSeqId="02">
+        <description>Require manager approval for orders over $5000</description>
+        <conditionTypeId>ORDER_TOTAL_GREATER_THAN</conditionTypeId>
+        <conditionValue>5000.00</conditionValue>
+        <requiresApproval>Y</requiresApproval>
+        <approvalLevel>MANAGER</approvalLevel>
+        <approvalTimeLimit>48</approvalTimeLimit>
+    </OrderProcessingRule>
+
+</entity-engine-xml>

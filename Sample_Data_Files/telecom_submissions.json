@@ -1,0 +1,88 @@
+{
+  "sector": "telecom",
+  "description": "Telecommunications service applications including mobile plans, internet service, and equipment requests",
+  "submissions": [
+    {
+      "id": "TEL-2024-001",
+      "type": "Mobile Phone Plan Application",
+      "content": "Application for family mobile phone plan. Account holder: James Brown, SSN: 123-00-4567, phone: (555) 012-3456, email: j.brown@email.com. Service address: 654 Pine Street, Seattle, WA 98101. Plan: Unlimited family plan for 4 lines. Credit check authorized. Previous carrier: Verizon, account in good standing for 8 years.",
+      "summary": "Family mobile plan - 4 lines - Unlimited - Credit check",
+      "user_context": {
+        "plan_type": "unlimited_family",
+        "number_of_lines": 4,
+        "credit_check_authorized": true,
+        "previous_carrier": "Verizon",
+        "account_history_years": 8,
+        "account_status": "good_standing",
+        "service_address": "654 Pine Street, Seattle, WA 98101",
+        "ssn": "123-00-4567",
+        "phone": "(555) 012-3456",
+        "email": "j.brown@email.com"
+      },
+      "user_id": "mobile_001",
+      "session_id": "mobile_session_001",
+      "ip_address": "198.51.100.90"
+    },
+    {
+      "id": "TEL-2024-002",
+      "type": "High-Speed Internet Application",
+      "content": "Application for residential high-speed internet service. Customer: Susan Davis, SSN: 234-00-5678, phone: (555) 123-4567, email: s.davis@email.com. Service address: 987 Maple Avenue, Phoenix, AZ 85001. Plan requested: Gigabit internet with Wi-Fi router included. Installation required. Credit score: 720. No previous service issues.",
+      "summary": "Gigabit internet - Residential - Wi-Fi included - Installation",
+      "user_context": {
+        "service_type": "high_speed_internet",
+        "speed_plan": "gigabit",
+        "wifi_router_included": true,
+        "installation_required": true,
+        "credit_score": 720,
+        "previous_service_issues": false,
+        "service_address": "987 Maple Avenue, Phoenix, AZ 85001",
+        "ssn": "234-00-5678",
+        "phone": "(555) 123-4567",
+        "email": "s.davis@email.com"
+      },
+      "user_id": "internet_001",
+      "session_id": "internet_session_001",
+      "ip_address": "203.0.113.100"
+    },
+    {
+      "id": "TEL-2024-003",
+      "type": "Business Phone System Request",
+      "content": "Enterprise phone system request for small business. Business: Marketing Pro Agency, contact: Michelle Taylor, SSN: 345-00-6789, phone: (555) 234-5678, email: m.taylor@marketingpro.com. Business address: 147 Business Park Drive, Miami, FL 33101. Requirements: 20-line phone system with voicemail, conference calling. Monthly budget: $2,000.",
+      "summary": "Business phone system - 20 lines - Conference calling - $2K budget",
+      "user_context": {
+        "business_name": "Marketing Pro Agency",
+        "service_type": "enterprise_phone_system",
+        "number_of_lines": 20,
+        "features_required": ["voicemail", "conference_calling"],
+        "monthly_budget": 2000,
+        "business_address": "147 Business Park Drive, Miami, FL 33101",
+        "contact_ssn": "345-00-6789",
+        "phone": "(555) 234-5678",
+        "email": "m.taylor@marketingpro.com"
+      },
+      "user_id": "business_001",
+      "session_id": "business_session_001",
+      "ip_address": "192.0.2.110"
+    },
+    {
+      "id": "TEL-2024-004",
+      "type": "Device Upgrade Request",
+      "content": "Mobile device upgrade request. Customer: Kevin Martinez, existing customer for 3 years, account #TEL789456. SSN: 456-00-7890, phone: (555) 345-6789, email: k.martinez@email.com. Current device: iPhone 12, requesting upgrade to iPhone 15 Pro. Trade-in value: $300. Monthly payment plan preferred.",
+      "summary": "Device upgrade - iPhone 12 to 15 Pro - Trade-in $300 - Payment plan",
+      "user_context": {
+        "customer_tenure_years": 3,
+        "account_number": "TEL789456",
+        "current_device": "iPhone 12",
+        "requested_device": "iPhone 15 Pro",
+        "trade_in_value": 300,
+        "payment_plan_preferred": true,
+        "ssn": "456-00-7890",
+        "phone": "(555) 345-6789",
+        "email": "k.martinez@email.com"
+      },
+      "user_id": "upgrade_001",
+      "session_id": "upgrade_session_001",
+      "ip_address": "198.51.100.120"
+    }
+  ]
+}
