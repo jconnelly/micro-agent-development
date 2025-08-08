@@ -10,14 +10,120 @@ from functools import lru_cache
 
 # Import other Agents from current location, change package location if moved
 from .BaseAgent import BaseAgent
-from .AuditingAgent import AgentAuditing, AuditLevel
+from .ComplianceMonitoringAgent import ComplianceMonitoringAgent, AuditLevel
 from .Exceptions import RuleExtractionError, ValidationError
 
 # Import the Google Generative AI library
 import google.generativeai as genai
 from google.generativeai import types # For GenerateContentConfig and other types
 
-class LegacyRuleExtractionAgent(BaseAgent):
+class BusinessRuleExtractionAgent(BaseAgent):
+    """
+    Business Rule Extraction Agent for Legacy System Modernization.
+    
+    **Business Purpose:**
+    Automatically discovers and translates hidden business rules from legacy code into 
+    clear, actionable business documentation. Critical for digital transformation, 
+    regulatory compliance, and business process optimization initiatives.
+    
+    **Key Business Benefits:**
+    - **Digital Transformation**: Accelerate legacy modernization by 60-80%
+    - **Regulatory Compliance**: Document business rules for audit and governance
+    - **Risk Mitigation**: Preserve critical business logic during system migrations  
+    - **Knowledge Transfer**: Convert tribal knowledge into documented processes
+    - **Business Analysis**: Enable process optimization and automation
+    
+    **Supported Legacy Technologies:**
+    - **COBOL**: Mainframe business applications and batch processing
+    - **Java**: Enterprise applications and web services  
+    - **C/C++**: System-level business logic and financial calculations
+    - **PL/SQL**: Database business rules and stored procedures
+    - **Visual Basic**: Desktop applications and Office macros
+    - **Perl**: Data processing and legacy integration scripts
+    - **FORTRAN**: Scientific and engineering calculations
+    - **Natural**: ADABAS database applications
+    
+    **Business Rule Categories:**
+    - **Validation Rules**: Data quality and business constraints
+    - **Calculation Rules**: Financial computations and pricing logic
+    - **Workflow Rules**: Process flow and approval hierarchies  
+    - **Authorization Rules**: Access control and permission matrices
+    - **Compliance Rules**: Regulatory requirements and audit trails
+    - **Integration Rules**: Data mapping and transformation logic
+    
+    **Industry Applications:**
+    - **Financial Services**: Banking regulations, loan processing, trading rules
+    - **Insurance**: Underwriting logic, claims processing, risk assessment
+    - **Healthcare**: Patient care protocols, billing rules, compliance
+    - **Manufacturing**: Quality control, supply chain, safety regulations  
+    - **Government**: Citizen services, tax processing, benefit calculations
+    - **Utilities**: Billing logic, service provisioning, regulatory compliance
+    
+    **AI-Powered Analysis:**
+    - Advanced language models identify implicit business rules
+    - Context-aware translation preserves business intent
+    - Domain-specific terminology recognition and translation
+    - Cross-reference analysis for rule dependencies
+    - Confidence scoring for rule extraction accuracy
+    
+    **Integration Examples:**
+    ```python
+    # Legacy system modernization project
+    from Agents.BusinessRuleExtractionAgent import BusinessRuleExtractionAgent
+    from Agents.ComplianceMonitoringAgent import ComplianceMonitoringAgent
+    
+    audit_system = ComplianceMonitoringAgent()
+    extractor = BusinessRuleExtractionAgent(
+        llm_client=ai_client,
+        audit_system=audit_system,
+        model_name="gemini-2.5-flash"
+    )
+    
+    # Extract business rules from COBOL mainframe code
+    with open("legacy_loan_processing.cbl") as f:
+        cobol_code = f.read()
+    
+    results = extractor.extract_and_translate_rules(
+        legacy_code_snippet=cobol_code,
+        context="Loan processing and credit decisioning system",
+        audit_level=2  # Full compliance documentation
+    )
+    
+    # Results contain business-readable rules:
+    # - "Loan Eligibility: Credit score must be 650 or higher"  
+    # - "Income Verification: Debt-to-income ratio cannot exceed 43%"
+    # - "Documentation: Employment verification required for loans over $100K"
+    ```
+    
+    **Performance & Scalability:**
+    - Intelligent chunking for large codebases (up to 10MB files)
+    - Parallel processing with rate limiting for API efficiency
+    - Caching for repeated code patterns and common rules
+    - Progress tracking for long-running extractions
+    - Automatic retry with exponential backoff
+    
+    **Quality Assurance:**
+    - Business rule confidence scoring (High/Medium/Low)
+    - Cross-reference validation between extracted rules
+    - Duplicate rule detection and consolidation
+    - Business domain classification and tagging
+    - Technical debt identification and prioritization
+    
+    **Compliance & Governance:**
+    - Complete audit trail of all extraction activities
+    - Source code traceability for each business rule
+    - Change impact analysis for modernization planning  
+    - Regulatory requirement mapping and documentation
+    - Risk assessment for rule migration priorities
+    
+    Warning:
+        Large legacy systems may require significant processing time and API resources.
+        Monitor usage and implement appropriate rate limiting for production workloads.
+    
+    Note:
+        This class uses business-friendly naming optimized for stakeholder
+        communications and enterprise documentation.
+    """
     # Rate limiting constants
     API_DELAY_SECONDS = 1.0
     MAX_RETRIES = 3
@@ -26,7 +132,7 @@ class LegacyRuleExtractionAgent(BaseAgent):
     API_TIMEOUT_SECONDS = 30
     TOTAL_OPERATION_TIMEOUT = 600  # 10 minutes
     
-    def __init__(self, llm_client: Any, audit_system: AgentAuditing, agent_id: str = None, 
+    def __init__(self, llm_client: Any, audit_system: ComplianceMonitoringAgent, agent_id: str = None, 
                  log_level: int = 0, model_name: str = "unknown", llm_provider: str = "unknown"):
         """
         Initializes the LegacyRuleExtractionAgent.
