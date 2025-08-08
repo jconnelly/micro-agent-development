@@ -207,7 +207,20 @@ class PIIScrubbingAgent(BaseAgent):
         # Convert external configuration to internal format
         for config_key, pii_type in pii_type_mapping.items():
             if config_key in pii_types_config:
-                raw_patterns[pii_type] = pii_types_config[config_key]['patterns']
+                patterns = pii_types_config[config_key]['patterns']
+                # Clean up patterns - remove r' prefix and ' suffix if present
+                cleaned_patterns = []
+                for pattern in patterns:
+                    if isinstance(pattern, str):
+                        # Remove r' prefix and ' suffix if present (YAML artifact)
+                        if pattern.startswith("r'") and pattern.endswith("'"):
+                            cleaned_pattern = pattern[2:-1]  # Remove r' and '
+                        elif pattern.startswith('r"') and pattern.endswith('"'):
+                            cleaned_pattern = pattern[2:-1]  # Remove r" and "
+                        else:
+                            cleaned_pattern = pattern
+                        cleaned_patterns.append(cleaned_pattern)
+                raw_patterns[pii_type] = cleaned_patterns
         
         # Pre-compile all patterns for significant performance improvement
         self.compiled_patterns: Dict[PIIType, List[Tuple[Pattern[str], str]]] = {}
