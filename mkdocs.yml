@@ -1,0 +1,221 @@
+# MkDocs Configuration for Micro-Agent Development Platform
+# Professional Documentation System with Automatic API Generation
+
+site_name: Micro-Agent Development Platform
+site_description: Enterprise AI Agent Platform for Business Rule Extraction, PII Protection, and Intelligent Document Processing
+site_author: Micro-Agent Development Team
+site_url: https://github.com/jconnelly/micro-agent-development
+
+# Repository Information
+repo_name: jconnelly/micro-agent-development
+repo_url: https://github.com/jconnelly/micro-agent-development
+edit_uri: edit/main/docs/
+
+# Configuration
+use_directory_urls: false
+strict: false
+
+# Theme Configuration - Material Design
+theme:
+  name: material
+  palette:
+    # Light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.path
+    - navigation.top
+    - navigation.footer
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.select
+    - content.tabs.link
+  
+  icon:
+    repo: fontawesome/brands/github
+    edit: material/pencil
+    view: material/eye
+  
+  font:
+    text: Roboto
+    code: Roboto Mono
+
+# Navigation Structure
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Quick Start: getting-started/quickstart.md
+    - Installation: getting-started/installation.md
+    - Configuration: getting-started/configuration.md
+  - User Guides:
+    - Business Rule Extraction: guides/business-rule-extraction.md
+    - Personal Data Protection: guides/personal-data-protection.md
+    - Application Triage: guides/application-triage.md
+    - Documentation Generation: guides/documentation-generation.md
+    - Compliance Monitoring: guides/compliance-monitoring.md
+  - API Reference:
+    - Agents:
+      - Business Rule Extraction Agent: api/agents/business-rule-extraction.md
+      - Application Triage Agent: api/agents/application-triage.md
+      - Personal Data Protection Agent: api/agents/personal-data-protection.md
+      - Rule Documentation Generator Agent: api/agents/rule-documentation-generator.md
+      - Compliance Monitoring Agent: api/agents/compliance-monitoring.md
+      - Advanced Documentation Agent: api/agents/advanced-documentation.md
+      - Enterprise Data Privacy Agent: api/agents/enterprise-data-privacy.md
+    - Utilities:
+      - Base Agent: api/utilities/base-agent.md
+      - Configuration Loader: api/utilities/config-loader.md
+      - Utility Functions: api/utilities/utils.md
+      - Exception Classes: api/utilities/exceptions.md
+  - Examples:
+    - Basic Usage: examples/basic-usage.md
+    - Enterprise Integration: examples/enterprise-integration.md
+    - Batch Processing: examples/batch-processing.md
+    - Custom Configuration: examples/custom-configuration.md
+  - Developer Guide:
+    - Architecture: developer/architecture.md
+    - Contributing: developer/contributing.md
+    - Testing: developer/testing.md
+    - Performance: developer/performance.md
+  - About:
+    - Changelog: about/changelog.md
+    - License: about/license.md
+
+# Extensions
+markdown_extensions:
+  # Python Markdown
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+      title: On this page
+  
+  # Python Markdown Extensions
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.magiclink:
+      normalize_issue_symbols: true
+      repo_url_shorthand: true
+      user: jconnelly
+      repo: micro-agent-development
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.snippets:
+      auto_append:
+        - includes/mkdocs.md
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+      combine_header_slug: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+# Plugins Configuration
+plugins:
+  - search:
+      separator: '[\s\-,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
+  - mkdocstrings:
+      enabled: true
+      default_handler: python
+      handlers:
+        python:
+          paths: [.]
+          options:
+            # Docstring parsing options
+            docstring_style: google
+            docstring_options:
+              ignore_init_summary: true
+            merge_init_into_class: true
+            
+            # Module options
+            show_source: true
+            show_root_heading: true
+            show_root_toc_entry: false
+            show_root_full_path: false
+            show_object_full_path: false
+            show_category_heading: true
+            
+            # Members options
+            members_order: source
+            group_by_category: true
+            show_submodules: false
+            
+            # Signatures options
+            show_signature: true
+            show_signature_annotations: true
+            signature_crossrefs: true
+            
+            # Additional options
+            show_bases: true
+            show_inheritance_diagram: false
+            preload_modules: []
+            
+            # Filtering options
+            filters: ["!^_[^_]"]
+            inherited_members: false
+
+# Additional MkDocs Configuration
+extra:
+  version:
+    provider: mike
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/jconnelly/micro-agent-development
+      name: GitHub Repository
+  generator: false
+
+extra_css:
+  - stylesheets/extra.css
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+
+# Build settings
+site_dir: site
+docs_dir: docs

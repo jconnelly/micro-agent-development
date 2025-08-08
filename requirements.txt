@@ -1,0 +1,19 @@
+# AI Agent Development Project Dependencies
+
+# Core Dependencies
+PyYAML>=6.0.1          # YAML configuration file parsing
+python-dotenv>=1.0.0    # Environment variable management
+
+# Google AI/LLM Dependencies  
+google-generativeai>=0.3.0  # Google Gemini API integration
+
+# Documentation Dependencies
+mkdocs>=1.6.0            # Static site generator for documentation
+mkdocs-material>=9.6.0   # Material Design theme for MkDocs
+mkdocstrings>=0.30.0     # Automatic API documentation from docstrings
+mkdocstrings-python>=1.16.0  # Python-specific handlers for mkdocstrings
+
+# Optional Development Dependencies (uncomment if needed)
+# pytest>=7.0.0         # Testing framework
+# black>=22.0.0         # Code formatting
+# flake8>=5.0.0         # Code linting
