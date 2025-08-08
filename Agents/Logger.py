@@ -45,7 +45,7 @@ class AgentLogger:
             
         return f"{prefix} {message}"
     
-    def info(self, message: str, request_id: Optional[str] = None, **kwargs):
+    def info(self, message: str, request_id: Optional[str] = None, **kwargs) -> None:
         """Log an info message."""
         formatted_msg = self._format_message("INFO", message, request_id)
         
@@ -63,7 +63,7 @@ class AgentLogger:
         if self.log_level >= 1:
             print(formatted_msg)
     
-    def warning(self, message: str, request_id: Optional[str] = None, **kwargs):
+    def warning(self, message: str, request_id: Optional[str] = None, **kwargs) -> None:
         """Log a warning message."""
         formatted_msg = self._format_message("WARN", message, request_id)
         
@@ -79,7 +79,7 @@ class AgentLogger:
         if self.log_level >= 1:
             print(formatted_msg)
     
-    def error(self, message: str, request_id: Optional[str] = None, exception: Optional[Exception] = None, **kwargs):
+    def error(self, message: str, request_id: Optional[str] = None, exception: Optional[Exception] = None, **kwargs) -> None:
         """Log an error message."""
         formatted_msg = self._format_message("ERROR", message, request_id)
         
@@ -99,7 +99,7 @@ class AgentLogger:
             if exception:
                 print(f"  Exception: {exception}")
     
-    def progress(self, message: str, request_id: Optional[str] = None, **kwargs):
+    def progress(self, message: str, request_id: Optional[str] = None, **kwargs) -> None:
         """Log a progress message (always shown even in production for user feedback)."""
         formatted_msg = self._format_message("", message, request_id)
         
@@ -115,7 +115,7 @@ class AgentLogger:
         # Progress messages shown regardless of log level for user experience
         print(formatted_msg)
     
-    def debug(self, message: str, request_id: Optional[str] = None, **kwargs):
+    def debug(self, message: str, request_id: Optional[str] = None, **kwargs) -> None:
         """Log a debug message (only in development mode)."""
         formatted_msg = self._format_message("DEBUG", message, request_id)
         
@@ -135,11 +135,11 @@ class AgentLogger:
         """Get all logs from the current session for audit trail."""
         return self.session_logs.copy()
     
-    def clear_session_logs(self):
+    def clear_session_logs(self) -> None:
         """Clear session logs (useful between operations)."""
         self.session_logs.clear()
     
-    def set_log_level(self, level: int):
+    def set_log_level(self, level: int) -> None:
         """Change the logging level at runtime."""
         self.log_level = level
     

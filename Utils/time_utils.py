@@ -5,7 +5,7 @@ Provides standardized time handling used across all agents for consistency.
 """
 
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, Callable
 
 
 class TimeUtils:
@@ -109,7 +109,7 @@ class TimeUtils:
             return dt
     
     @staticmethod
-    def create_operation_timer():
+    def create_operation_timer() -> Callable[[], float]:
         """
         Create a simple timer context for measuring operation duration.
         

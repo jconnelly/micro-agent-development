@@ -33,6 +33,7 @@ from functools import lru_cache
 # Import other Agents from current location, change package location if moved
 from .BaseAgent import BaseAgent
 from .AuditingAgent import AgentAuditing
+from .Exceptions import PIIProcessingError, ConfigurationError, ValidationError
 
 # Import Utils - handle both relative and absolute imports
 try:
@@ -126,7 +127,7 @@ class PIIScrubbingAgent(BaseAgent):
         # Initialize context-specific configurations
         self._initialize_context_config()
     
-    def _initialize_patterns(self):
+    def _initialize_patterns(self) -> None:
         """Initialize and pre-compile regex patterns for different PII types for optimal performance"""
         # Fallback pattern definitions (preserved from original hardcoded values)
         fallback_patterns = {
@@ -248,7 +249,7 @@ class PIIScrubbingAgent(BaseAgent):
         total_patterns = sum(len(patterns) for patterns in self.compiled_patterns.values())
         self.logger.info(f"Pre-compiled {total_patterns} PII regex patterns for optimal performance")
     
-    def _initialize_context_config(self):
+    def _initialize_context_config(self) -> None:
         """Initialize context-specific PII handling configurations using external config with fallback"""
         # Fallback context configurations (preserved from original hardcoded values)
         fallback_context_configs = {
@@ -549,7 +550,11 @@ class PIIScrubbingAgent(BaseAgent):
                     "enable_tokenization": self.enable_tokenization
                 }, "pii_scrubbing")
             
-            raise Exception(error_msg)
+            raise PIIProcessingError(
+                error_msg.replace("PII scrubbing failed: ", ""),
+                context={"audit_level": audit_level},
+                request_id=request_id
+            )
     
     def _detect_pii(self, text: str) -> Dict[str, Any]:
         """
@@ -719,7 +724,11 @@ class PIIScrubbingAgent(BaseAgent):
             Dictionary with restored data and audit information
         """
         if not self.enable_tokenization:
-            raise ValueError("Tokenization not enabled for this PII scrubbing agent")
+            raise ValidationError(
+                "Tokenization not enabled for this PII scrubbing agent",
+                context={"operation": "detokenization", "tokenization_enabled": False},
+                request_id=request_id
+            )
         
         request_id = request_id or f"detok-{uuid.uuid4().hex[:12]}"
         self.logger.request_id = request_id

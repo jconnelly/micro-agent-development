@@ -6,6 +6,7 @@ from typing import Dict, Any, Optional, List
 # Import other Agents from current location, change package location if moved
 from .BaseAgent import BaseAgent
 from .AuditingAgent import AgentAuditing, AuditLevel
+from .Exceptions import TriageProcessingError, ValidationError
 from .PIIScrubbingAgent import PIIScrubbingAgent, PIIContext, MaskingStrategy
 
 class IntelligentSubmissionTriageAgent(BaseAgent):
@@ -58,7 +59,7 @@ class IntelligentSubmissionTriageAgent(BaseAgent):
     
     # _log_exception_to_audit() method now inherited from BaseAgent
 
-    def _api_call_with_retry(self, submission_data: Dict[str, Any], request_id: str):
+    def _api_call_with_retry(self, submission_data: Dict[str, Any], request_id: str) -> Dict[str, Any]:
         """
         Make API call with retry logic using base class functionality.
         """
@@ -78,7 +79,7 @@ class IntelligentSubmissionTriageAgent(BaseAgent):
             lambda: self._mock_llm_call(submission_data, request_id)
         )
     
-    def _mock_llm_call(self, submission_data: Dict[str, Any], request_id: str):
+    def _mock_llm_call(self, submission_data: Dict[str, Any], request_id: str) -> Dict[str, Any]:
         """
         Mock LLM call for demonstration. Replace with actual LLM client call.
         """

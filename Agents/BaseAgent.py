@@ -9,11 +9,12 @@ import socket
 import asyncio
 import time
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Callable
 from datetime import datetime, timezone
 
 from .Logger import AgentLogger
 from .AuditingAgent import AgentAuditing
+from .Exceptions import ConfigurationError, APITimeoutError
 
 # Import Utils and config loader - handle both relative and absolute imports
 try:
@@ -80,9 +81,9 @@ class BaseAgent(ABC):
         # System dependencies
         self.audit_system = audit_system
         
-        # Initialize logger
+        # Initialize logger (ensure log_level is integer)
         self.logger = AgentLogger(
-            log_level=log_level,
+            log_level=int(log_level) if isinstance(log_level, (str, float)) else log_level,
             agent_name=agent_name
         )
         
@@ -255,11 +256,11 @@ class BaseAgent(ABC):
     
     async def _api_call_with_retry_async(
         self, 
-        api_call_func,
-        *args,
+        api_call_func: Callable[..., Any],
+        *args: Any,
         max_retries: Optional[int] = None,
         timeout_seconds: Optional[float] = None,
-        **kwargs
+        **kwargs: Any
     ) -> Any:
         """
         Async API call with retry logic and timeout handling.
@@ -293,7 +294,10 @@ class BaseAgent(ABC):
             except asyncio.TimeoutError:
                 self.logger.warning(f"API call timed out after {timeout_seconds} seconds")
                 if attempt == max_retries - 1:
-                    raise TimeoutError(f"API call failed after {max_retries} attempts due to timeouts")
+                    raise APITimeoutError(
+                        f"API call failed after {max_retries} attempts due to timeouts",
+                        context={"max_retries": max_retries, "timeout_seconds": timeout_seconds}
+                    )
                     
             except Exception as e:
                 self.logger.warning(f"API call failed (attempt {attempt + 1}/{max_retries}): {str(e)}")
@@ -307,11 +311,11 @@ class BaseAgent(ABC):
     
     def _api_call_with_retry(
         self, 
-        api_call_func,
-        *args,
+        api_call_func: Callable[..., Any],
+        *args: Any,
         max_retries: Optional[int] = None,
         timeout_seconds: Optional[float] = None,
-        **kwargs
+        **kwargs: Any
     ) -> Any:
         """
         Synchronous wrapper for async API retry logic.

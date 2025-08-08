@@ -6,6 +6,7 @@ from typing import Dict, Any, List, Optional
 # Import other Agents from current location, change package location if moved
 from .BaseAgent import BaseAgent
 from .AuditingAgent import AgentAuditing, AuditLevel
+from .Exceptions import DocumentationError, ValidationError
 
 # Import Utils - handle both relative and absolute imports
 try:

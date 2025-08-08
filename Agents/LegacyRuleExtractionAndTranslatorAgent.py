@@ -11,6 +11,7 @@ from functools import lru_cache
 # Import other Agents from current location, change package location if moved
 from .BaseAgent import BaseAgent
 from .AuditingAgent import AgentAuditing, AuditLevel
+from .Exceptions import RuleExtractionError, ValidationError
 
 # Import the Google Generative AI library
 import google.generativeai as genai
@@ -74,9 +75,30 @@ class LegacyRuleExtractionAgent(BaseAgent):
             f"If no business rules are found, return an empty array.\n\n"
             f"Code Snippet:\n```\n{code_snippet}\n```\n\n"
             f"Example JSON Output Format:\n"
-            f"""
-
-            """
+            f"""[
+  {{
+    "rule_id": "RULE_001",
+    "conditions": "Customer age must be 18 or older",
+    "actions": "Approve loan application for processing",
+    "business_description": "Loan Eligibility Rule: Only adult customers (18+) are eligible for loan applications to comply with legal requirements",
+    "source_lines": "lines 45-47",
+    "technical_implementation": "if (customer.age >= 18) {{ approveApplication(customer); }}",
+    "business_domain": "financial_services",
+    "priority": "high",
+    "compliance_notes": "Legal requirement - age of majority"
+  }},
+  {{
+    "rule_id": "RULE_002", 
+    "conditions": "Credit score below 600",
+    "actions": "Automatically reject application",
+    "business_description": "Credit Risk Rule: Applications with credit scores below 600 are automatically rejected due to high default risk",
+    "source_lines": "lines 52-55",
+    "technical_implementation": "if (creditScore < 600) {{ rejectApplication('LOW_CREDIT'); }}",
+    "business_domain": "risk_management",
+    "priority": "high",
+    "compliance_notes": "Risk management policy"
+  }}
+]"""
         )
         if context:
             user_prompt = f"Consider the following context: {context}\n\n" + user_prompt
@@ -157,7 +179,7 @@ class LegacyRuleExtractionAgent(BaseAgent):
     
     # _log_exception_to_audit() method now inherited from BaseAgent
     
-    def _api_call_with_retry(self, prompt: str):
+    def _api_call_with_retry(self, prompt: str) -> Dict[str, Any]:
         """
         Make API call with retry logic using base class functionality.
         """
@@ -204,7 +226,10 @@ class LegacyRuleExtractionAgent(BaseAgent):
         
         # Validate parameters
         if chunk_size < MIN_CHUNK_SIZE + overlap_size:
-            raise ValueError(f"chunk_size ({chunk_size}) must be at least MIN_CHUNK_SIZE + overlap_size ({MIN_CHUNK_SIZE + overlap_size})")
+            raise ValidationError(
+                f"chunk_size ({chunk_size}) must be at least MIN_CHUNK_SIZE + overlap_size ({MIN_CHUNK_SIZE + overlap_size})",
+                context={"chunk_size": chunk_size, "min_required": MIN_CHUNK_SIZE + overlap_size}
+            )
         
         # For small files, return as single chunk
         if total_lines <= chunk_size:
@@ -213,7 +238,10 @@ class LegacyRuleExtractionAgent(BaseAgent):
         # Estimate chunk count and validate
         estimated_chunks = max(1, (total_lines - overlap_size) // (chunk_size - overlap_size))
         if estimated_chunks > MAX_CHUNKS:
-            raise ValueError(f"File too large: would create ~{estimated_chunks} chunks (max {MAX_CHUNKS}). Consider increasing chunk_size or processing manually.")
+            raise ValidationError(
+                f"File too large: would create ~{estimated_chunks} chunks (max {MAX_CHUNKS}). Consider increasing chunk_size or processing manually.",
+                context={"estimated_chunks": estimated_chunks, "max_chunks": MAX_CHUNKS, "total_lines": total_lines}
+            )
         
         chunks = []
         context_lines = self._extract_file_context(lines)
