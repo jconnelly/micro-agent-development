@@ -1,0 +1,48 @@
+[
+  {
+    "rule_id": "LOAN_001", 
+    "business_description": "Prime borrower qualification criteria for conventional loans",
+    "conditions": "Credit score must be 650 or higher AND debt-to-income ratio must be 43% or lower AND applicant must have verified employment",
+    "actions": "Approve loan application for manual underwriting review and set interest rate to prime rate",
+    "business_domain": "banking",
+    "priority": "critical",
+    "source_lines": "lines 145-162 in loan_processor.cobol",
+    "technical_implementation": "COBOL IF-THEN-ELSE logic with nested conditions",
+    "compliance_notes": "Complies with Equal Credit Opportunity Act (ECOA) requirements",
+    "dependencies": ["CREDIT_VERIFICATION_001", "INCOME_VALIDATION_002"]
+  },
+  {
+    "rule_id": "LOAN_002",
+    "business_description": "Subprime borrower rejection criteria for high-risk applications", 
+    "conditions": "Credit score is below 580 OR debt-to-income ratio exceeds 50% OR bankruptcy within last 2 years",
+    "actions": "Automatically reject loan application with specific reason codes and compliance documentation",
+    "business_domain": "banking",
+    "priority": "critical",
+    "source_lines": "lines 163-185 in loan_processor.cobol",
+    "technical_implementation": "COBOL conditional logic with multiple exit points",
+    "compliance_notes": "Adverse action notices required per Fair Credit Reporting Act (FCRA)",
+    "dependencies": ["CREDIT_HISTORY_001", "BANKRUPTCY_CHECK_001"]
+  },
+  {
+    "rule_id": "INSURANCE_001",
+    "business_description": "Auto insurance eligibility age restrictions",
+    "conditions": "Applicant age is between 18 and 80 years for standard auto insurance coverage",
+    "actions": "Qualify applicant for standard auto insurance rates and coverage options",
+    "business_domain": "insurance", 
+    "priority": "high",
+    "source_lines": "VALIDATE-AGE section in insurance_validation.cbl",
+    "technical_implementation": "COBOL age validation with MIN-AGE and MAX-AGE constants",
+    "compliance_notes": "State insurance commission age requirements compliance"
+  },
+  {
+    "rule_id": "HEALTHCARE_001",
+    "business_description": "Patient medication dosage safety check for elderly patients",
+    "conditions": "Patient age is over 65 AND prescribed medication has elderly dosage warnings",
+    "actions": "Flag prescription for clinical pharmacist review and adjust dosage recommendations",
+    "business_domain": "healthcare",
+    "priority": "critical", 
+    "source_lines": "medication_safety_check() function lines 89-120",
+    "compliance_notes": "HIPAA compliant patient safety protocol",
+    "dependencies": ["PATIENT_AGE_VERIFICATION", "DRUG_INTERACTION_CHECK"]
+  }
+]

@@ -84,6 +84,63 @@ for rule in result['extracted_rules']:
    Actions: Reject loan application with reason code
 ```
 
+## 📁 Supported File Formats & Extensions
+
+The BusinessRuleExtractionAgent supports a wide range of legacy file formats. Here are the **recommended file extensions** and what to expect:
+
+### ✅ **Fully Supported Formats**
+
+| Extension | Language/System | Example Use Cases | Processing Notes |
+|-----------|----------------|------------------|------------------|
+| **`.cbl`, `.cob`, `.cobol`** | COBOL | Mainframe banking, insurance, government systems | Excellent rule extraction from paragraphs and IF statements |
+| **`.java`, `.jsp`** | Java/J2EE | Enterprise web applications, business logic | Strong support for business methods and validation rules |
+| **`.cpp`, `.cc`, `.c`** | C/C++ | Financial calculations, trading systems, embedded systems | Good for algorithmic business rules and calculations |
+| **`.pl`, `.pm`** | Perl | Legacy data processing, text manipulation, integration scripts | Effective for data transformation rules |
+| **`.rb`** | Ruby | Web applications, business rule engines | Good support for Rails models and business logic |
+| **`.sql`, `.plsql`** | SQL/PL-SQL | Database stored procedures, business logic in DB | Excellent for data validation and business constraint rules |
+| **`.vb`, `.vba`** | Visual Basic | Desktop applications, Office macros, legacy systems | Strong support for business validation and workflow rules |
+| **`.cs`** | C# | .NET enterprise applications, business services | Good extraction from business layer classes |
+| **`.py`** | Python | Business applications, data processing, automation | Effective for business logic and rule-based systems |
+| **`.xml`** | XML Config | Business rule configurations, workflow definitions | Good for declarative rule extraction |
+
+### 🔧 **Specialized Legacy Formats**
+
+| Extension | System | Description | Sample Available |
+|-----------|--------|-------------|------------------|
+| **`.clp`** | CLIPS | Expert systems, rule-based AI | ✅ `sample_legacy_banking.clp` |
+| **`.drl`** | Drools | Business rule management systems | ✅ `sample_legacy_insurance.drl` |
+| **`.mumps`, `.m`** | MUMPS/M | Healthcare systems, medical databases | ✅ `sample_legacy_healthcare.mumps` |
+| **`.pas`** | Pascal/Delphi | Legacy manufacturing, scientific applications | ✅ `sample_legacy_manufacturing.pas` |
+| **`.bpmn`** | BPMN | Business process workflows | ✅ `sample_legacy_workflow.bpmn` |
+| **`.4gl`** | 4GL Systems | Legacy database applications | Contact support for specific 4GL dialects |
+| **`.natural`** | Natural/ADABAS | Mainframe database applications | Processing available on request |
+
+### 📋 **What to Prepare Before Processing**
+
+#### **File Content Requirements**
+```
+✅ DO include:
+- Complete business logic functions/methods
+- Validation rules and conditional statements  
+- Business calculations and algorithms
+- Workflow decision points
+- Data validation logic
+- Approval/rejection criteria
+
+❌ AVOID:
+- Pure technical setup code (imports, includes)
+- Database connection logic only
+- UI/presentation layer code without business rules
+- Empty files or comment-only files
+- Binary files or compiled code
+```
+
+#### **Optimal File Size Guidelines**
+- **Small files (< 175 lines)**: Processed in single pass - fastest
+- **Medium files (175-1000 lines)**: Automatic chunking with context preservation  
+- **Large files (1000+ lines)**: Intelligent chunking with progress tracking
+- **Maximum recommended**: 10MB per file for optimal performance
+
 ## 🏢 Supported Legacy Systems
 
 The agent is trained to handle multiple legacy technologies:
@@ -257,6 +314,295 @@ The agent automatically classifies business domains and adapts extraction accord
 | **Healthcare** | patient, diagnosis, treatment, hipaa | Clinical workflows and HIPAA compliance |
 | **E-commerce** | order, customer, payment, inventory | Customer experience and fulfillment |
 | **Government** | citizen, benefit, eligibility, tax | Public service and regulatory rules |
+
+## 📚 **Practical Examples with Sample Files**
+
+The platform includes comprehensive sample files you can use to test and learn. All samples are located in `Sample_Data_Files/`:
+
+### 🏦 **COBOL Insurance System Example**
+
+**File:** `Sample_Data_Files/sample_legacy_insurance.cbl`
+**Use Case:** Insurance policy validation and premium calculation
+
+```python
+# Process real COBOL insurance system
+with open("Sample_Data_Files/sample_legacy_insurance.cbl", "r") as f:
+    cobol_insurance = f.read()
+
+result = extractor.extract_and_translate_rules(
+    legacy_code_snippet=cobol_insurance,
+    context="""
+    Legacy mainframe insurance system from 1985.
+    Handles policy validation for auto, life, and home insurance.
+    Contains business rules for eligibility, risk assessment, and premium calculation.
+    Must comply with state insurance regulations.
+    """,
+    audit_level=2
+)
+
+print(f"✅ Extracted {len(result['extracted_rules'])} business rules from COBOL:")
+for rule in result['extracted_rules'][:3]:  # Show first 3
+    print(f"  📋 {rule['rule_id']}: {rule['business_description']}")
+```
+
+**Expected Output:**
+```
+✅ Extracted 15 business rules from COBOL:
+  📋 RULE_001: Minimum Age Eligibility - Applicants must be at least 18 years old for any insurance policy
+  📋 RULE_002: Auto Insurance Age Limit - Auto insurance applicants cannot exceed 80 years of age
+  📋 RULE_003: Credit Score Requirement - Minimum credit score of 600 required for policy approval
+```
+
+### 🏥 **MUMPS Healthcare System Example**
+
+**File:** `Sample_Data_Files/sample_legacy_healthcare.mumps`
+**Use Case:** Medical record processing and patient care protocols
+
+```python
+# Process MUMPS healthcare system
+with open("Sample_Data_Files/sample_legacy_healthcare.mumps", "r") as f:
+    mumps_healthcare = f.read()
+
+result = extractor.extract_and_translate_rules(
+    legacy_code_snippet=mumps_healthcare,
+    context="""
+    Legacy MUMPS/M healthcare system for patient record management.
+    Contains clinical decision support rules, medication protocols, and HIPAA compliance logic.
+    Used in hospital setting for patient care coordination.
+    """,
+    audit_level=2
+)
+```
+
+### 🏭 **Pascal Manufacturing System Example**
+
+**File:** `Sample_Data_Files/sample_legacy_manufacturing.pas`
+**Use Case:** Quality control and production rules
+
+```python
+# Process Pascal manufacturing system
+with open("Sample_Data_Files/sample_legacy_manufacturing.pas", "r") as f:
+    pascal_manufacturing = f.read()
+
+result = extractor.extract_and_translate_rules(
+    legacy_code_snippet=pascal_manufacturing,
+    context="""
+    Legacy Pascal system for manufacturing quality control.
+    Implements production rules, safety protocols, and quality assurance checks.
+    Used in automotive parts manufacturing facility.
+    """,
+    audit_level=2
+)
+```
+
+### 🔄 **BPMN Business Process Example**
+
+**File:** `Sample_Data_Files/sample_legacy_workflow.bpmn`
+**Use Case:** Business process workflows and decision points
+
+```python
+# Process BPMN workflow definitions
+with open("Sample_Data_Files/sample_legacy_workflow.bpmn", "r") as f:
+    bpmn_workflow = f.read()
+
+result = extractor.extract_and_translate_rules(
+    legacy_code_snippet=bpmn_workflow,
+    context="""
+    BPMN workflow definition for loan approval process.
+    Contains business process rules, decision gateways, and approval workflows.
+    Used for automated loan processing and manual review triggers.
+    """,
+    audit_level=2
+)
+```
+
+### 💰 **C++ Trading System Example**
+
+**File:** `Sample_Data_Files/sample_legacy_trading.cpp`
+**Use Case:** Financial trading rules and risk management
+
+```python
+# Process C++ trading system
+with open("Sample_Data_Files/sample_legacy_trading.cpp", "r") as f:
+    cpp_trading = f.read()
+
+result = extractor.extract_and_translate_rules(
+    legacy_code_snippet=cpp_trading,
+    context="""
+    Legacy C++ high-frequency trading system.
+    Contains risk management rules, position limits, and trading algorithms.
+    Must comply with financial regulations and risk management policies.
+    """,
+    audit_level=2
+)
+```
+
+### 🧠 **CLIPS Expert System Example**
+
+**File:** `Sample_Data_Files/sample_legacy_banking.clp`
+**Use Case:** Expert system rules for banking decisions
+
+```python
+# Process CLIPS expert system
+with open("Sample_Data_Files/sample_legacy_banking.clp", "r") as f:
+    clips_banking = f.read()
+
+result = extractor.extract_and_translate_rules(
+    legacy_code_snippet=clips_banking,
+    context="""
+    CLIPS expert system for banking loan decisions.
+    Rule-based system for credit evaluation and loan approval.
+    Implements complex business logic for financial risk assessment.
+    """,
+    audit_level=2
+)
+```
+
+## 🎯 **File Processing Workflow**
+
+### **Step 1: File Preparation**
+```python
+def prepare_file_for_extraction(file_path, encoding='utf-8'):
+    """Prepare legacy file for business rule extraction"""
+    try:
+        with open(file_path, 'r', encoding=encoding) as f:
+            content = f.read()
+        
+        # Basic validation
+        if len(content.strip()) == 0:
+            raise ValueError("File is empty")
+            
+        if len(content) > 10 * 1024 * 1024:  # 10MB
+            print("⚠️  Warning: Large file detected. Processing may take time.")
+            
+        return content, len(content.splitlines())
+        
+    except UnicodeDecodeError:
+        # Try alternative encodings
+        for alt_encoding in ['latin-1', 'cp1252', 'iso-8859-1']:
+            try:
+                with open(file_path, 'r', encoding=alt_encoding) as f:
+                    content = f.read()
+                print(f"✅ File read using {alt_encoding} encoding")
+                return content, len(content.splitlines())
+            except UnicodeDecodeError:
+                continue
+        raise ValueError(f"Unable to decode file {file_path}")
+
+# Example usage
+content, line_count = prepare_file_for_extraction("Sample_Data_Files/sample_legacy_insurance.cbl")
+print(f"📄 Loaded {line_count} lines from COBOL insurance system")
+```
+
+### **Step 2: Context Preparation**
+```python
+def generate_context_for_file(file_path, business_domain=None):
+    """Generate appropriate context based on file characteristics"""
+    
+    file_ext = Path(file_path).suffix.lower()
+    file_name = Path(file_path).stem
+    
+    # Domain detection from filename
+    domain_keywords = {
+        'insurance': ['insurance', 'policy', 'claim', 'premium'],
+        'banking': ['banking', 'loan', 'credit', 'account'], 
+        'trading': ['trading', 'market', 'position', 'risk'],
+        'healthcare': ['healthcare', 'medical', 'patient', 'clinical'],
+        'manufacturing': ['manufacturing', 'production', 'quality']
+    }
+    
+    detected_domain = business_domain
+    if not detected_domain:
+        for domain, keywords in domain_keywords.items():
+            if any(keyword in file_name.lower() for keyword in keywords):
+                detected_domain = domain
+                break
+    
+    # Extension-specific context
+    ext_contexts = {
+        '.cbl': f"Legacy COBOL mainframe system",
+        '.cpp': f"C++ high-performance system", 
+        '.java': f"Java enterprise application",
+        '.mumps': f"MUMPS/M healthcare database system",
+        '.pas': f"Pascal/Delphi legacy application",
+        '.clp': f"CLIPS expert system with rule-based logic",
+        '.drl': f"Drools business rule management system"
+    }
+    
+    base_context = ext_contexts.get(file_ext, "Legacy business system")
+    
+    if detected_domain:
+        domain_contexts = {
+            'insurance': "for insurance policy processing and risk assessment",
+            'banking': "for banking operations and financial services",  
+            'trading': "for financial trading and risk management",
+            'healthcare': "for patient care and medical record management",
+            'manufacturing': "for production control and quality assurance"
+        }
+        base_context += f" {domain_contexts.get(detected_domain, '')}"
+    
+    return f"{base_context}. Contains embedded business rules and decision logic."
+
+# Example usage  
+context = generate_context_for_file("Sample_Data_Files/sample_legacy_insurance.cbl")
+print(f"📋 Generated context: {context}")
+```
+
+### **Step 3: Batch Processing Multiple Files**
+```python
+def batch_extract_rules(sample_directory="Sample_Data_Files", file_patterns=None):
+    """Process multiple sample files in batch"""
+    
+    if file_patterns is None:
+        file_patterns = ["*.cbl", "*.java", "*.cpp", "*.mumps", "*.pas", "*.clp", "*.drl"]
+    
+    sample_files = []
+    for pattern in file_patterns:
+        sample_files.extend(Path(sample_directory).glob(pattern))
+    
+    results = {}
+    
+    for file_path in sample_files:
+        print(f"\n🔍 Processing {file_path.name}...")
+        
+        try:
+            content, line_count = prepare_file_for_extraction(str(file_path))
+            context = generate_context_for_file(str(file_path))
+            
+            result = extractor.extract_and_translate_rules(
+                legacy_code_snippet=content,
+                context=context,
+                audit_level=1  # Minimal audit for batch processing
+            )
+            
+            results[file_path.name] = {
+                'rules_extracted': len(result['extracted_rules']),
+                'file_size_lines': line_count,
+                'status': 'success',
+                'rules': result['extracted_rules']
+            }
+            
+            print(f"✅ {file_path.name}: {len(result['extracted_rules'])} rules extracted")
+            
+        except Exception as e:
+            results[file_path.name] = {
+                'rules_extracted': 0,
+                'file_size_lines': 0,
+                'status': 'failed', 
+                'error': str(e)
+            }
+            print(f"❌ {file_path.name}: Failed - {e}")
+    
+    return results
+
+# Run batch processing
+batch_results = batch_extract_rules()
+
+# Summary
+total_rules = sum(r['rules_extracted'] for r in batch_results.values())
+successful_files = sum(1 for r in batch_results.values() if r['status'] == 'success')
+print(f"\n📊 Batch Summary: {total_rules} rules from {successful_files} files")
+```
 
 ### Domain-Specific Example
 

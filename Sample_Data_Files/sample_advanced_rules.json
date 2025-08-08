@@ -1,0 +1,98 @@
+[
+  {
+    "rule_id": "ENTERPRISE_LOAN_001",
+    "business_description": "Enterprise lending decision framework for commercial real estate loans over $5M",
+    "conditions": "Loan amount exceeds $5,000,000 AND property type is commercial real estate AND borrower has minimum 25% down payment AND debt service coverage ratio >= 1.25",
+    "actions": "Route to executive lending committee for approval with full financial analysis and require additional collateral documentation",
+    "business_domain": "banking",
+    "priority": "critical",
+    "source_lines": "enterprise_lending_module.java lines 234-289",
+    "technical_implementation": "Java Spring Boot microservice with database integration and workflow orchestration",
+    "compliance_notes": "Complies with Basel III capital requirements and Dodd-Frank qualified mortgage standards",
+    "dependencies": ["CREDIT_ANALYSIS_ENTERPRISE", "COLLATERAL_VALUATION", "COMMITTEE_WORKFLOW"],
+    
+    "stakeholder_impact": {
+      "executive_committee": "high",
+      "loan_officers": "medium", 
+      "risk_management": "critical",
+      "customers": "medium",
+      "compliance_team": "high"
+    },
+    "implementation_complexity": "high",
+    "testing_requirements": [
+      "loan_amount_boundary_testing",
+      "property_type_validation",
+      "dscr_calculation_accuracy",
+      "committee_routing_workflow",
+      "compliance_rule_validation"
+    ],
+    "business_value": {
+      "annual_loan_volume_impact": 50000000,
+      "risk_reduction_percentage": 15,
+      "processing_time_reduction_hours": 48,
+      "compliance_cost_savings": 125000
+    },
+    "risk_assessment": {
+      "operational_risk": "medium",
+      "compliance_risk": "low", 
+      "financial_impact_if_failed": 2000000,
+      "reputation_risk": "high",
+      "mitigation_strategies": ["executive_oversight", "dual_approval", "automated_compliance_checks"]
+    },
+    "version_info": {
+      "version": "2.1",
+      "last_updated": "2024-01-15T10:30:00Z",
+      "changed_by": "senior_credit_analyst",
+      "change_reason": "Updated DSCR threshold per regulatory guidance",
+      "approval_status": "approved"
+    }
+  },
+  {
+    "rule_id": "INSURANCE_ENTERPRISE_001", 
+    "business_description": "Large commercial property insurance underwriting decision matrix",
+    "conditions": "Property value exceeds $10,000,000 OR high-risk industry classification OR located in catastrophe-prone geographic zone",
+    "actions": "Require specialized risk assessment, additional reinsurance coverage, and senior underwriter approval with enhanced premium calculation",
+    "business_domain": "insurance",
+    "priority": "critical",
+    "source_lines": "commercial_underwriting.py class CommercialRiskAnalyzer methods 156-203",
+    "technical_implementation": "Python class-based system with ML risk scoring integration and external data sources",
+    "compliance_notes": "Meets state insurance commission capital adequacy requirements and catastrophic risk standards",
+    "dependencies": ["PROPERTY_VALUATION_SERVICE", "CATASTROPHE_MODELING", "REINSURANCE_CALCULATOR"],
+    
+    "stakeholder_impact": {
+      "underwriters": "critical",
+      "risk_managers": "high",
+      "reinsurance_team": "high", 
+      "sales_team": "medium",
+      "customers": "medium"
+    },
+    "implementation_complexity": "critical",
+    "testing_requirements": [
+      "property_value_threshold_testing",
+      "industry_classification_accuracy",
+      "geographic_zone_mapping",
+      "ml_risk_scoring_validation", 
+      "reinsurance_calculation_accuracy"
+    ],
+    "business_value": {
+      "annual_premium_protected": 25000000,
+      "loss_ratio_improvement": 8.5,
+      "underwriting_accuracy_increase": 22,
+      "processing_efficiency_gain_hours": 120
+    },
+    "risk_assessment": {
+      "operational_risk": "high",
+      "compliance_risk": "medium",
+      "financial_impact_if_failed": 15000000,
+      "reputation_risk": "critical",
+      "mitigation_strategies": ["senior_review", "ml_model_validation", "geographic_risk_modeling"]
+    },
+    "version_info": {
+      "version": "1.4",
+      "last_updated": "2024-02-01T14:15:30Z", 
+      "changed_by": "chief_underwriter",
+      "change_reason": "Enhanced catastrophe modeling integration",
+      "approval_status": "approved"
+    }
+  }
+]

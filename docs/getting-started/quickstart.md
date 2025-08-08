@@ -8,7 +8,11 @@ Before you begin, ensure you have:
 
 - **Python 3.9+** installed on your system
 - **Git** for repository cloning
-- **Google Generative AI API key** ([Get one here](https://makersuite.google.com/app/apikey))
+- **LLM API key** - Choose from:
+  - **Google Gemini** ([Get key](https://makersuite.google.com/app/apikey)) - Default, free tier available
+  - **OpenAI GPT** ([Get key](https://platform.openai.com/api-keys)) - Premium models
+  - **Anthropic Claude** ([Get key](https://console.anthropic.com/)) - Advanced reasoning
+  - **Azure OpenAI** - Enterprise deployment
 - **Basic Python knowledge** for configuration and usage
 
 ## ⚡ 5-Minute Setup
@@ -104,6 +108,31 @@ In 5 minutes, you've:
 
 Try other agents with the same pattern:
 
+=== "🆕 BYO-LLM (Bring Your Own LLM)"
+    
+    ```python
+    from Utils.llm_providers import OpenAILLMProvider, ClaudeLLMProvider
+    from Agents.BusinessRuleExtractionAgent import BusinessRuleExtractionAgent
+    from Agents.ComplianceMonitoringAgent import ComplianceMonitoringAgent
+    import os
+    
+    # Use OpenAI GPT instead of Gemini
+    os.environ["OPENAI_API_KEY"] = "your_openai_key_here"
+    openai_provider = OpenAILLMProvider(model_name="gpt-4o")
+    
+    audit_system = ComplianceMonitoringAgent()
+    extractor = BusinessRuleExtractionAgent(
+        audit_system=audit_system,
+        llm_provider=openai_provider  # Custom LLM provider!
+    )
+    
+    # Same API, different LLM provider - no code changes needed!
+    result = extractor.extract_and_translate_rules(
+        legacy_code_snippet="if (score >= 650) approve_loan();",
+        context="Banking system"
+    )
+    ```
+
 === "PII Protection"
     
     ```python
@@ -155,6 +184,7 @@ Try other agents with the same pattern:
 ### Dive Deeper
 
 - **[Installation Guide](installation.md)** - Detailed setup for production
+- **[BYO-LLM Configuration](../guides/byo-llm-configuration.md)** - 🆕 Use your preferred LLM provider
 - **[Configuration Guide](configuration.md)** - Customize for your environment
 - **[User Guides](../guides/business-rule-extraction.md)** - Learn each agent in detail
 - **[API Reference](../api/agents/business-rule-extraction.md)** - Complete technical documentation

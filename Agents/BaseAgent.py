@@ -9,17 +9,18 @@ import socket
 import asyncio
 import time
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, Callable
+from typing import Any, Dict, Optional, Callable, Union
 from datetime import datetime, timezone
 
 from .Logger import AgentLogger
-from .AuditingAgent import AgentAuditing
+from .ComplianceMonitoringAgent import ComplianceMonitoringAgent
 from .Exceptions import ConfigurationError, APITimeoutError
 
 # Import Utils and config loader - handle both relative and absolute imports
 try:
     from ..Utils import RequestIdGenerator, TimeUtils
     from ..Utils.config_loader import get_config_loader
+    from ..Utils.llm_providers import LLMProvider, get_default_llm_provider
 except ImportError:
     import sys
     import os
@@ -29,6 +30,7 @@ except ImportError:
         sys.path.insert(0, parent_dir)
     from Utils import RequestIdGenerator, TimeUtils
     from Utils.config_loader import get_config_loader
+    from Utils.llm_providers import LLMProvider, get_default_llm_provider
 
 
 class BaseAgent(ABC):
@@ -47,11 +49,11 @@ class BaseAgent(ABC):
     
     def __init__(
         self, 
-        audit_system: AgentAuditing, 
+        audit_system: ComplianceMonitoringAgent, 
         agent_id: str = None,
         log_level: int = 0,
-        model_name: str = "unknown",
-        llm_provider: str = "unknown",
+        model_name: str = None,
+        llm_provider: Union[LLMProvider, str] = None,
         agent_name: str = "BaseAgent"
     ):
         """
@@ -61,8 +63,8 @@ class BaseAgent(ABC):
             audit_system: The auditing system instance for logging
             agent_id: Unique identifier for this agent instance
             log_level: 0 for production (silent), 1 for development (verbose)
-            model_name: Name of the LLM model being used
-            llm_provider: Name of the LLM provider (e.g., "openai", "anthropic")
+            model_name: Name of the LLM model being used (optional, inferred from provider)
+            llm_provider: LLM provider instance or provider type string (defaults to Gemini)
             agent_name: Human-readable name for this agent
         """
         # Core agent identification
@@ -74,9 +76,28 @@ class BaseAgent(ABC):
         self.agent_name = agent_name
         self.version = "1.0.0"
         
-        # LLM configuration
-        self.model_name = model_name
-        self.llm_provider = llm_provider
+        # LLM configuration - handle both provider instances and legacy strings
+        if isinstance(llm_provider, str):
+            # Legacy string provider name (for backward compatibility)
+            self.llm_provider_name = llm_provider
+            self.llm_provider = None  # Will use legacy approach
+            self.model_name = model_name or "unknown"
+        elif llm_provider is None:
+            # Default to Gemini provider
+            try:
+                self.llm_provider = get_default_llm_provider()
+                self.llm_provider_name = self.llm_provider.get_provider_type().value
+                self.model_name = model_name or self.llm_provider.get_model_name()
+            except Exception:
+                # Fallback to legacy if LLM provider fails to initialize
+                self.llm_provider = None
+                self.llm_provider_name = "gemini"
+                self.model_name = model_name or "gemini-1.5-flash"
+        else:
+            # Custom LLM provider instance
+            self.llm_provider = llm_provider
+            self.llm_provider_name = llm_provider.get_provider_type().value
+            self.model_name = model_name or llm_provider.get_model_name()
         
         # System dependencies
         self.audit_system = audit_system
@@ -373,6 +394,67 @@ class BaseAgent(ABC):
             Duration in milliseconds
         """
         return TimeUtils.calculate_duration_ms(start_time, end_time)
+    
+    def _call_llm(self, prompt: str, **kwargs) -> Dict[str, Any]:
+        """
+        Make an LLM call using the configured provider with fallback support.
+        
+        This method abstracts LLM calls to work with both new LLM providers
+        and legacy agent implementations, providing seamless backward compatibility.
+        
+        Args:
+            prompt: Text prompt to send to the LLM
+            **kwargs: Provider-specific parameters (temperature, max_tokens, etc.)
+            
+        Returns:
+            Dict containing:
+            - content: LLM response text
+            - model_name: Model that generated the response
+            - provider_type: Provider type used
+            - usage_stats: Token usage information (if available)
+            - response_time_ms: Response time in milliseconds
+            - error: Error message if call failed
+        """
+        if self.llm_provider is not None:
+            # Use new LLM provider abstraction
+            try:
+                response = self.llm_provider.generate_content(prompt, **kwargs)
+                
+                return {
+                    "content": response.content,
+                    "model_name": response.model_name,
+                    "provider_type": response.provider_type.value,
+                    "usage_stats": response.usage_stats,
+                    "response_time_ms": response.response_time_ms,
+                    "request_id": response.request_id,
+                    "error": response.error,
+                    "success": response.error is None
+                }
+                
+            except Exception as e:
+                return {
+                    "content": "",
+                    "model_name": self.model_name,
+                    "provider_type": self.llm_provider_name,
+                    "usage_stats": None,
+                    "response_time_ms": None,
+                    "request_id": None,
+                    "error": f"LLM provider call failed: {str(e)}",
+                    "success": False
+                }
+        else:
+            # Legacy mode - return structure indicating legacy handling needed
+            return {
+                "content": "",
+                "model_name": self.model_name,
+                "provider_type": self.llm_provider_name,
+                "usage_stats": None,
+                "response_time_ms": None,
+                "request_id": None,
+                "error": "Legacy LLM mode - subclass must handle LLM call",
+                "success": False,
+                "legacy_mode": True
+            }
     
     @abstractmethod
     def get_agent_info(self) -> Dict[str, Any]:

@@ -68,6 +68,8 @@ nav:
     - Configuration: getting-started/configuration.md
   - User Guides:
     - Business Rule Extraction: guides/business-rule-extraction.md
+    - BYO-LLM Configuration: guides/byo-llm-configuration.md
+    - JSON Input Formats: guides/json-input-formats.md
     - Personal Data Protection: guides/personal-data-protection.md
     - Application Triage: guides/application-triage.md
     - Documentation Generation: guides/documentation-generation.md
