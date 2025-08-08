@@ -1,0 +1,197 @@
+# LLM Prompt Templates for Rule Documentation
+# Used by RuleDocumentationAgent for generating business rule documentation
+#
+# Templates support variable substitution using {variable_name} syntax
+# Available variables depend on the specific prompt context
+
+documentation_prompts:
+  
+  # Main system prompt for documentation generation
+  system_prompt:
+    description: "Core system prompt defining the documentation agent's role"
+    template: |
+      You are an expert business rule documentation and translation agent. 
+      Your task is to take a list of structured business rules, refine their 
+      business descriptions for clarity, and generate a concise, human-readable 
+      summary of the rule set. Ensure all technical jargon is replaced with 
+      business-friendly terminology. Output should be a JSON object containing 
+      both a high-level summary and refined individual rule descriptions.
+    variables: []
+    
+  # Main user prompt for documentation refinement
+  user_prompt:
+    description: "Core user prompt with instructions for refining rule documentation"
+    template: |
+      Refine the business descriptions and summarize the following set of business rules. 
+      Ensure the language is clear for non-technical stakeholders.
+
+      Rules:
+      ```json
+      {rules_json_str}
+      ```
+
+      Provide output in JSON: {{'summary': '...', 'detailed_rules': [...]}}
+    variables:
+      - rules_json_str
+      
+  # Domain-specific documentation prompts
+  domain_specific_prompt:
+    description: "Enhanced prompt with domain context for better documentation"
+    template: |
+      You are documenting business rules for the {domain} domain. 
+      Focus on {domain_focus} and ensure terminology aligns with {domain} industry standards.
+      
+      Refine the business descriptions and summarize the following set of business rules. 
+      Ensure the language is clear for non-technical stakeholders in the {domain} industry.
+
+      Rules:
+      ```json
+      {rules_json_str}
+      ```
+      
+      Consider these domain characteristics:
+      - Primary concerns: {domain_concerns}
+      - Key terminology: {domain_terminology}
+      - Regulatory context: {regulatory_context}
+
+      Provide output in JSON: {{'summary': '...', 'detailed_rules': [...], 'domain_context': '...'}}
+    variables:
+      - domain
+      - domain_focus
+      - rules_json_str
+      - domain_concerns
+      - domain_terminology
+      - regulatory_context
+
+# Output format specifications
+output_formats:
+  
+  # Standard documentation format
+  standard_format:
+    description: "Standard JSON structure for rule documentation"
+    required_fields:
+      - summary: "High-level summary of all rules in business language"
+      - detailed_rules: "Array of refined individual rule descriptions"
+    structure: |
+      {
+        "summary": "Clear, concise overview of what the rules accomplish",
+        "detailed_rules": [
+          {
+            "rule_id": "unique_identifier",
+            "business_description": "Refined business description",
+            "conditions": "When this rule applies",
+            "actions": "What happens when conditions are met",
+            "business_impact": "Why this rule matters to the business"
+          }
+        ]
+      }
+      
+  # Extended documentation format
+  extended_format:
+    description: "Extended format with additional metadata and context"
+    required_fields:
+      - summary: "High-level summary of all rules"
+      - detailed_rules: "Array of refined rules with metadata"
+      - domain_context: "Domain-specific context and implications"
+      - compliance_notes: "Regulatory or compliance considerations"
+    structure: |
+      {
+        "summary": "Executive summary for business stakeholders",
+        "detailed_rules": [
+          {
+            "rule_id": "unique_identifier", 
+            "business_description": "Clear business language description",
+            "conditions": "Trigger conditions in business terms",
+            "actions": "Business outcomes and actions",
+            "business_impact": "Strategic importance to organization",
+            "stakeholders": "Who is affected by this rule",
+            "risk_level": "Business risk if rule fails"
+          }
+        ],
+        "domain_context": "Industry-specific context and background",
+        "compliance_notes": "Regulatory requirements and implications",
+        "implementation_priority": "Suggested priority for implementation"
+      }
+
+# Domain-specific documentation templates
+domain_templates:
+  
+  financial:
+    description: "Financial services rule documentation"
+    domain_focus: "regulatory compliance, risk management, and financial calculations"
+    domain_concerns: "accuracy of calculations, regulatory compliance, audit trail"
+    domain_terminology: "loans, credit, interest rates, risk assessment, compliance"
+    regulatory_context: "Banking regulations, consumer protection, anti-money laundering"
+    summary_template: |
+      This rule set governs {rule_count} financial business processes, focusing on 
+      {primary_areas}. The rules ensure compliance with financial regulations while 
+      maintaining operational efficiency and risk management standards.
+    
+  insurance:
+    description: "Insurance industry rule documentation"  
+    domain_focus: "policy management, claims processing, and risk assessment"
+    domain_concerns: "policy accuracy, claim validity, risk evaluation, customer service"
+    domain_terminology: "policies, coverage, premiums, claims, underwriting, risk factors"
+    regulatory_context: "Insurance regulations, consumer protection, solvency requirements"
+    summary_template: |
+      This rule set manages {rule_count} insurance business processes, covering 
+      {primary_areas}. The rules ensure proper policy administration, accurate 
+      claim processing, and effective risk management.
+    
+  healthcare:
+    description: "Healthcare system rule documentation"
+    domain_focus: "patient care protocols, safety requirements, and regulatory compliance" 
+    domain_concerns: "patient safety, treatment efficacy, regulatory compliance, data privacy"
+    domain_terminology: "patients, treatments, medications, diagnoses, protocols, safety"
+    regulatory_context: "HIPAA, FDA regulations, medical standards, patient safety requirements"
+    summary_template: |
+      This rule set governs {rule_count} healthcare business processes, emphasizing 
+      {primary_areas}. The rules prioritize patient safety while ensuring 
+      regulatory compliance and operational effectiveness.
+      
+  ecommerce:
+    description: "E-commerce platform rule documentation"
+    domain_focus: "order processing, customer experience, and business operations"
+    domain_concerns: "customer satisfaction, order accuracy, payment security, inventory management"
+    domain_terminology: "orders, customers, products, payments, shipping, inventory"
+    regulatory_context: "Consumer protection, data privacy, payment security standards"
+    summary_template: |
+      This rule set controls {rule_count} e-commerce business processes, managing 
+      {primary_areas}. The rules optimize customer experience while maintaining 
+      operational efficiency and security standards.
+
+# Documentation generation settings
+generation_settings:
+  
+  # Language and tone preferences
+  language_style:
+    tone: "professional, clear, accessible"
+    audience: "business stakeholders, non-technical users"
+    complexity_level: "intermediate business language"
+    avoid_terms: ["code", "function", "variable", "implementation", "algorithm"]
+    prefer_terms: ["process", "rule", "condition", "outcome", "business logic"]
+    
+  # Content organization
+  content_structure:
+    summary_length: "2-4 sentences maximum"
+    rule_description_length: "1-2 paragraphs maximum"  
+    include_examples: true
+    include_business_rationale: true
+    group_related_rules: true
+    
+  # Quality standards
+  quality_requirements:
+    clarity_score: 0.8        # Minimum clarity score (0.0-1.0)
+    completeness_check: true  # Verify all required fields present
+    consistency_check: true   # Ensure terminology consistency
+    stakeholder_focus: true   # Prioritize stakeholder value
+
+# Template metadata
+metadata:
+  version: "1.0.0"
+  last_updated: "2025-01-08" 
+  description: "LLM prompt templates for business rule documentation and visualization"
+  total_prompts: 3
+  supported_domains: ["financial", "insurance", "healthcare", "ecommerce", "general"]
+  supported_formats: ["standard", "extended", "domain_specific"]
+  template_engine: "python_str_format"  # Uses {variable} syntax

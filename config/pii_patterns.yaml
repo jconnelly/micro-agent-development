@@ -1,0 +1,153 @@
+# PII Detection Pattern Configuration
+# Used by PIIScrubbingAgent for detecting and scrubbing sensitive data
+#
+# Each PII type contains:
+# - patterns: List of regex patterns for detection
+# - description: Human-readable description of the PII type
+# - priority: Priority level for detection (1=highest, 5=lowest)
+# - default_strategy: Default masking strategy for this PII type
+
+pii_types:
+  ssn:
+    description: "Social Security Numbers - US government identification"
+    priority: 1
+    default_strategy: "tokenize"
+    patterns:
+      - r'\b\d{3}-\d{2}-\d{4}\b'      # 123-45-6789 (standard format)
+      - r'\b\d{3}\s\d{2}\s\d{4}\b'    # 123 45 6789 (space-separated)
+      - r'\b\d{9}\b'                  # 123456789 (9 consecutive digits)
+
+  credit_card:
+    description: "Credit card numbers - payment card information"
+    priority: 1
+    default_strategy: "tokenize"
+    patterns:
+      - r'\b4\d{3}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b'        # Visa (starts with 4)
+      - r'\b5[1-5]\d{2}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b'   # MasterCard (starts with 51-55)
+      - r'\b3[47]\d{2}[\s-]?\d{6}[\s-]?\d{5}\b'               # American Express (starts with 34/37)
+      - r'\b6011[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b'          # Discover (starts with 6011)
+
+  phone_number:
+    description: "Phone numbers - personal contact information"
+    priority: 2
+    default_strategy: "partial_mask"
+    patterns:
+      - r'(?<!\d)\(\d{3}\)\s?\d{3}-\d{4}(?!\d)'    # (555) 123-4567 (formatted)
+      - r'\b\d{3}-\d{3}-\d{4}\b'                   # 555-123-4567 (hyphenated)
+      - r'\b\d{3}\.\d{3}\.\d{4}\b'                 # 555.123.4567 (dotted)
+      - r'\b\d{10}\b'                              # 5551234567 (10 consecutive digits)
+
+  email:
+    description: "Email addresses - personal contact information"
+    priority: 2
+    default_strategy: "partial_mask"
+    patterns:
+      - r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'  # Standard email format
+
+  account_number:
+    description: "Bank account numbers - financial account identifiers"
+    priority: 1
+    default_strategy: "tokenize"
+    patterns:
+      - r'\b\d{8,17}\b'  # 8-17 digit account numbers (common range)
+
+  date_of_birth:
+    description: "Dates of birth - personal identification information"
+    priority: 2
+    default_strategy: "partial_mask"
+    patterns:
+      - r'\b\d{1,2}/\d{1,2}/\d{4}\b'   # MM/DD/YYYY or M/D/YYYY
+      - r'\b\d{1,2}-\d{1,2}-\d{4}\b'   # MM-DD-YYYY or M-D-YYYY
+      - r'\b\d{4}-\d{1,2}-\d{1,2}\b'   # YYYY-MM-DD or YYYY-M-D (ISO format)
+
+  bank_routing:
+    description: "Bank routing numbers - financial institution identifiers"
+    priority: 1
+    default_strategy: "tokenize"
+    patterns:
+      - r'\b\d{9}\b'  # 9-digit routing numbers (ABA format)
+
+  driver_license:
+    description: "Driver license numbers - government-issued ID"
+    priority: 2
+    default_strategy: "tokenize"
+    patterns:
+      - r'\b[A-Za-z]{1,2}\d{6,8}\b'     # State prefix + digits (common format)
+      - r'\b\d{7,10}\b'                 # Numeric-only licenses
+
+  passport:
+    description: "Passport numbers - international travel documents"
+    priority: 1
+    default_strategy: "tokenize"
+    patterns:
+      - r'\b\d{9}\b'                    # US passport format (9 digits)
+      - r'\b[A-Za-z]\d{8}\b'            # International format (letter + 8 digits)
+      - r'\b[A-Za-z]{2}\d{7}\b'         # Alternative international format
+
+# Context-specific configurations for different business domains
+context_configs:
+  financial:
+    description: "Financial services - banking, lending, insurance"
+    priority_types: ["ssn", "credit_card", "account_number", "bank_routing"]
+    default_strategy: "tokenize"
+    require_full_audit: true
+
+  healthcare:
+    description: "Healthcare - medical records, patient information"
+    priority_types: ["ssn", "date_of_birth", "phone_number", "email"]
+    default_strategy: "hash"
+    require_full_audit: true
+
+  general:
+    description: "General business - default configuration"
+    priority_types: ["ssn", "credit_card", "phone_number", "email"]
+    default_strategy: "partial_mask"
+    require_full_audit: false
+
+  legal:
+    description: "Legal services - contracts, court documents"
+    priority_types: ["ssn", "date_of_birth", "driver_license", "passport"]
+    default_strategy: "tokenize"
+    require_full_audit: true
+
+  government:
+    description: "Government services - public sector applications"
+    priority_types: ["ssn", "passport", "driver_license", "date_of_birth"]
+    default_strategy: "hash"
+    require_full_audit: true
+
+# Masking strategy definitions
+masking_strategies:
+  full_mask:
+    description: "Replace entire value with asterisks"
+    replacement: "***REDACTED***"
+
+  partial_mask:
+    description: "Show first/last characters, mask middle"
+    show_first: 2
+    show_last: 2
+    mask_char: "*"
+
+  tokenize:
+    description: "Replace with reversible token (requires token storage)"
+    token_prefix: "PII_TOKEN_"
+    reversible: true
+
+  hash:
+    description: "One-way hash (irreversible but consistent)"
+    algorithm: "sha256"
+    salt_prefix: "PII_SALT_"
+    reversible: false
+
+  remove:
+    description: "Remove entirely from text"
+    replacement: ""
+
+# Configuration metadata
+metadata:
+  version: "1.0.0"
+  last_updated: "2025-01-07"
+  total_pii_types: 10
+  total_patterns: 24
+  description: "PII detection patterns and masking configurations for data protection"
+  compliance: ["GDPR", "CCPA", "HIPAA", "PCI-DSS"]

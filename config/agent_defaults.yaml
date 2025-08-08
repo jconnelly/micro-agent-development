@@ -1,0 +1,117 @@
+# Agent Default Configuration Settings
+# Used by all AI agents for consistent timeout, retry, and cache behavior
+#
+# This configuration provides centralized control over:
+# - API timeouts and retry behavior  
+# - Cache sizes for performance optimization
+# - Processing thresholds and limits
+# - Default model configurations
+
+agent_defaults:
+  # API Call Configuration
+  api_settings:
+    description: "Default settings for LLM API calls across all agents"
+    timeout_seconds: 30.0      # Default API call timeout
+    max_retries: 3             # Maximum retry attempts for failed API calls
+    total_operation_timeout: 300.0  # Total operation timeout (5 minutes) for BaseAgent
+    retry_backoff_base: 2.0    # Base for exponential backoff (seconds)
+    retry_backoff_max: 16.0    # Maximum backoff time between retries
+    
+  # Agent-Specific Overrides
+  legacy_extraction_agent:
+    description: "Settings specific to LegacyRuleExtractionAndTranslatorAgent"
+    api_timeout_seconds: 30    # Per-chunk API timeout
+    max_retries: 3             # Retry attempts for chunk processing
+    total_operation_timeout: 600  # 10 minutes for large file processing
+    max_chunks: 50             # Maximum number of chunks to process
+    min_chunk_size: 10         # Minimum lines per chunk
+    chunking_threshold: 175    # Line count threshold for chunked processing
+    cache_size: 128            # LRU cache size for file context extraction
+    
+  intelligent_triage_agent:
+    description: "Settings specific to IntelligentSubmissionTriageAgent"
+    api_timeout_seconds: 30.0  # API call timeout (inherits from BaseAgent)
+    max_retries: 3             # Retry attempts (inherits from BaseAgent)
+    min_audit_level_for_pii: 2 # Minimum audit level to limit PII verbosity
+    
+  pii_scrubbing_agent:
+    description: "Settings specific to PIIScrubbingAgent"
+    cache_size: 256            # LRU cache size for PII detection results
+    
+  rule_documentation_agent:
+    description: "Settings specific to RuleDocumentationAgent" 
+    api_timeout_seconds: 30.0  # API call timeout (inherits from BaseAgent)
+    max_retries: 3             # Retry attempts (inherits from BaseAgent)
+    
+  # Cache Configuration
+  caching:
+    description: "Default cache settings for performance optimization"
+    default_lru_cache_size: 128     # Default LRU cache size
+    pii_detection_cache_size: 256   # PII detection cache size
+    file_context_cache_size: 128    # File context extraction cache size
+    ip_resolution_cache_ttl: 300    # IP resolution cache TTL in seconds
+    
+  # Processing Thresholds
+  processing_limits:
+    description: "Default limits and thresholds for data processing"
+    max_file_chunks: 50        # Maximum chunks per file processing
+    min_chunk_lines: 10        # Minimum lines per processing chunk
+    chunking_line_threshold: 175  # Threshold for switching to chunked processing
+    max_context_lines: 50      # Maximum lines for context extraction
+    
+  # Model Configuration Defaults
+  model_defaults:
+    description: "Default LLM model configurations"
+    default_model_name: "gemini-1.5-flash"
+    default_llm_provider: "google"
+    temperature: 0.1           # Low temperature for consistent responses
+    max_output_tokens: 4096    # Maximum tokens in model response
+    
+  # Audit Configuration  
+  audit_defaults:
+    description: "Default audit and logging behavior"
+    default_audit_level: 2     # Standard audit level (1=full, 4=minimal)
+    log_performance_metrics: true   # Whether to log performance data
+    include_token_usage: true       # Include token usage in audit logs
+    
+  # Error Handling
+  error_handling:
+    description: "Default error handling and resilience settings"
+    enable_graceful_degradation: true  # Enable fallback mechanisms
+    log_exceptions: true              # Log all exceptions to audit system
+    continue_on_partial_failure: true # Continue processing on non-critical errors
+    max_consecutive_failures: 5      # Max failures before stopping processing
+
+# Environment-Specific Overrides
+environments:
+  development:
+    description: "Development environment settings"
+    api_settings:
+      timeout_seconds: 60.0    # Longer timeouts for debugging
+      max_retries: 1           # Fewer retries to fail fast
+    audit_defaults:
+      default_audit_level: 1   # Full auditing for development
+      
+  production:
+    description: "Production environment settings"
+    api_settings:
+      timeout_seconds: 30.0    # Standard timeouts
+      max_retries: 3           # Standard retry behavior
+    audit_defaults:
+      default_audit_level: 3   # Reduced auditing for performance
+      
+  testing:
+    description: "Testing environment settings"
+    api_settings:
+      timeout_seconds: 15.0    # Faster timeouts for tests
+      max_retries: 2           # Moderate retry behavior
+    caching:
+      default_lru_cache_size: 64  # Smaller caches for test isolation
+
+# Configuration metadata
+metadata:
+  version: "1.0.0"
+  last_updated: "2025-01-08"
+  description: "Centralized agent configuration for timeouts, retries, caches, and processing limits"
+  total_settings: 25
+  environments_supported: ["development", "production", "testing"]

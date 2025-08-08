@@ -1,0 +1,118 @@
+# Business Domain Classification Configuration
+# Used by RuleDocumentationAgent for automatic domain detection
+# 
+# Each domain contains:
+# - keywords: List of domain-specific terms for classification
+# - weight: Scoring weight for this domain (1.0 = normal weight)
+# - description: Human-readable description of the domain
+
+domains:
+  insurance:
+    description: "Insurance industry - policy validation, claims, underwriting"
+    weight: 1.0
+    keywords:
+      - "policy"
+      - "premium" 
+      - "coverage"
+      - "beneficiary"
+      - "accident"
+      - "smoker"
+      - "dui"
+      - "vehicle"
+      - "life insurance"
+      - "auto insurance"
+      - "claim"
+      - "deductible"
+      - "underwriting"
+
+  trading:
+    description: "Financial trading and risk management"  
+    weight: 1.0
+    keywords:
+      - "trade"
+      - "position"
+      - "margin"
+      - "leverage"
+      - "portfolio"
+      - "volatility"
+      - "order"
+      - "risk"
+      - "trader"
+      - "execution"
+      - "market"
+      - "liquidity"
+      - "hedge"
+      - "derivative"
+
+  lending:
+    description: "Loan processing and credit evaluation"
+    weight: 1.0
+    keywords:
+      - "loan"
+      - "credit score"
+      - "dti"
+      - "debt"
+      - "income"
+      - "collateral"
+      - "interest rate"
+      - "mortgage"
+      - "approval"
+      - "borrower"
+      - "refinance"
+      - "amortization"
+
+  banking:
+    description: "Banking operations and account management"
+    weight: 1.0
+    keywords:
+      - "account"
+      - "deposit"
+      - "balance"
+      - "transaction"
+      - "withdrawal"
+      - "overdraft"
+      - "fee"
+      - "branch"
+      - "atm"
+      - "wire transfer"
+      - "routing"
+
+  healthcare:
+    description: "Healthcare and medical decision support"
+    weight: 1.0
+    keywords:
+      - "patient"
+      - "diagnosis"
+      - "treatment"
+      - "medication"
+      - "doctor"
+      - "hospital"
+      - "medical"
+      - "prescription"
+      - "therapy"
+      - "clinic"
+      - "procedure"
+
+  ecommerce:
+    description: "E-commerce and retail operations"
+    weight: 1.0
+    keywords:
+      - "order"
+      - "customer"
+      - "product"
+      - "payment"
+      - "shipping"
+      - "inventory"
+      - "cart"
+      - "checkout"
+      - "refund"
+      - "discount"
+      - "catalog"
+
+# Configuration metadata
+metadata:
+  version: "1.0.0"
+  last_updated: "2025-01-07"
+  total_domains: 6
+  total_keywords: 78
+  description: "Domain classification keywords for automatic business rule categorization"

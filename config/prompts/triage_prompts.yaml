@@ -1,0 +1,216 @@
+# LLM Prompt Templates for Intelligent Submission Triage
+# Used by IntelligentSubmissionTriageAgent for analyzing and categorizing submissions
+#
+# Templates support variable substitution using {variable_name} syntax
+# Available variables depend on the specific prompt context
+
+triage_prompts:
+  
+  # Main system prompt for submission triage
+  system_prompt:
+    description: "Core system prompt defining the triage agent's role and capabilities"
+    template: |
+      You are an intelligent submission triage agent. Your task is to analyze 
+      incoming {submission_type} submissions and categorize them, identify key risks, 
+      and suggest a preliminary action (e.g., 'Approve', 'Reject', 'Escalate to Human'). 
+      Be concise and output your decision in a structured JSON format.
+    variables:
+      - submission_type
+    
+  # Main user prompt for triage analysis  
+  user_prompt:
+    description: "Core user prompt with submission details and analysis instructions"
+    template: |
+      Analyze the following submission:
+
+      Submission ID: {submission_id}
+      Submission Content: {submission_content}
+      Summary: {submission_summary}
+      User Context: {user_context}
+
+      Provide your triage decision in JSON format:
+      {{
+        "decision": "Approve|Reject|Escalate",
+        "confidence": 0.0-1.0,
+        "reasoning": "Brief explanation",
+        "risk_factors": ["factor1", "factor2"],
+        "recommended_action": "Specific next steps"
+      }}
+    variables:
+      - submission_id
+      - submission_content
+      - submission_summary
+      - user_context
+      
+  # Risk-focused triage prompt
+  risk_assessment_prompt:
+    description: "Enhanced prompt focusing on risk identification and mitigation"
+    template: |
+      You are performing risk assessment triage on {submission_type} submissions.
+      Focus on identifying potential risks, compliance issues, and security concerns.
+      
+      Analyze the following submission with emphasis on risk factors:
+
+      Submission ID: {submission_id}
+      Submission Type: {submission_type}
+      Content: {submission_content}
+      Risk Context: {risk_context}
+      User Profile: {user_profile}
+      Historical Patterns: {user_history}
+
+      Provide detailed risk assessment in JSON format:
+      {{
+        "overall_risk": "Low|Medium|High|Critical",
+        "decision": "Approve|Reject|Escalate|Flag",
+        "confidence": 0.0-1.0,
+        "risk_factors": [
+          {{"factor": "name", "severity": "level", "description": "details"}}
+        ],
+        "compliance_check": "Pass|Fail|Review",
+        "security_flags": ["flag1", "flag2"],
+        "mitigation_steps": ["step1", "step2"],
+        "escalation_reason": "Why escalation is needed (if applicable)"
+      }}
+    variables:
+      - submission_type
+      - submission_id
+      - submission_content
+      - risk_context
+      - user_profile
+      - user_history
+      
+  # Fast triage prompt for high-volume processing
+  fast_triage_prompt:
+    description: "Streamlined prompt for high-volume, low-complexity submissions"
+    template: |
+      Quick triage for {submission_type} submission. Focus on clear approve/reject decision.
+      
+      Submission: {submission_content}
+      Auto-checks: {automated_checks}
+      
+      JSON response (concise):
+      {{
+        "decision": "Approve|Reject",
+        "confidence": 0.0-1.0,
+        "reason": "One sentence explanation"
+      }}
+    variables:
+      - submission_type
+      - submission_content  
+      - automated_checks
+
+# Submission type specific templates
+submission_types:
+  
+  loan_application:
+    description: "Templates for loan application triage"
+    system_prompt_suffix: |
+      Focus on creditworthiness, income verification, debt-to-income ratios, 
+      and regulatory compliance. Consider loan amount, collateral, and repayment capacity.
+    risk_factors:
+      - high_debt_to_income_ratio
+      - insufficient_income_verification
+      - poor_credit_history
+      - inadequate_collateral
+      - regulatory_red_flags
+    decision_criteria:
+      approve: "Strong credit, verified income, acceptable DTI ratio"
+      reject: "Poor credit, insufficient income, high risk factors"
+      escalate: "Borderline case requiring human judgment"
+      
+  insurance_claim:
+    description: "Templates for insurance claim triage"
+    system_prompt_suffix: |
+      Evaluate claim validity, policy coverage, supporting documentation,
+      and potential fraud indicators. Consider claim amount and policy terms.
+    risk_factors:
+      - insufficient_documentation
+      - policy_coverage_questions
+      - fraud_indicators
+      - unusual_claim_patterns
+      - high_claim_amount
+    decision_criteria:
+      approve: "Valid claim, good documentation, within policy terms"
+      reject: "Invalid claim, excluded coverage, clear fraud"
+      escalate: "Complex claim requiring investigation"
+      
+  account_opening:
+    description: "Templates for new account opening requests"
+    system_prompt_suffix: |
+      Verify customer identity, assess risk profile, check compliance requirements,
+      and evaluate account type appropriateness. Consider KYC/AML requirements.
+    risk_factors:
+      - identity_verification_issues
+      - high_risk_customer_profile
+      - compliance_concerns
+      - suspicious_activity_indicators
+      - incomplete_documentation
+    decision_criteria:
+      approve: "Identity verified, low risk, compliant"
+      reject: "Failed verification, high risk, non-compliant"
+      escalate: "Requires additional verification or review"
+
+# Output format specifications
+output_formats:
+  
+  # Standard triage decision
+  standard_decision:
+    description: "Standard JSON format for triage decisions"
+    required_fields:
+      - decision: "Primary triage decision (Approve|Reject|Escalate)"
+      - confidence: "Confidence level 0.0-1.0"
+      - reasoning: "Brief explanation of the decision"
+    optional_fields:
+      - risk_factors: "Array of identified risk factors"
+      - recommended_action: "Specific next steps"
+      - urgency: "Priority level for processing"
+      
+  # Extended triage analysis
+  extended_analysis:
+    description: "Comprehensive triage analysis with detailed breakdown"
+    required_fields:
+      - decision: "Primary triage decision"
+      - confidence: "Confidence level 0.0-1.0"
+      - reasoning: "Detailed explanation"
+      - risk_assessment: "Comprehensive risk analysis"
+      - compliance_status: "Regulatory compliance check"
+      - recommendation: "Detailed recommended actions"
+
+# Quality control prompts
+quality_control:
+  
+  confidence_calibration:
+    description: "Guidance for confidence score calibration"
+    guidelines: |
+      Confidence levels:
+      - 0.9-1.0: Very confident, clear-cut case
+      - 0.7-0.9: Confident, standard processing
+      - 0.5-0.7: Moderate confidence, consider review
+      - 0.3-0.5: Low confidence, likely escalation
+      - 0.0-0.3: Very uncertain, requires human review
+      
+  escalation_triggers:
+    description: "Conditions that should trigger escalation"
+    conditions:
+      - confidence_below_threshold: 0.6
+      - high_risk_indicators: 3
+      - compliance_flags: 1
+      - unusual_patterns: true
+      - high_value_submission: true
+
+# Processing configuration
+processing_config:
+  default_confidence_threshold: 0.6    # Minimum confidence for auto-processing
+  escalation_confidence_limit: 0.5     # Below this, always escalate
+  max_risk_factors: 5                  # Maximum risk factors to identify
+  response_timeout: 30                 # Seconds for LLM response
+  
+# Template metadata  
+metadata:
+  version: "1.0.0"
+  last_updated: "2025-01-08"
+  description: "LLM prompt templates for intelligent submission triage and risk assessment"
+  total_prompts: 4
+  supported_submission_types: ["loan_application", "insurance_claim", "account_opening", "general"]
+  supported_decisions: ["Approve", "Reject", "Escalate", "Flag"]
+  template_engine: "python_str_format"  # Uses {variable} syntax

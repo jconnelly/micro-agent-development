@@ -36,14 +36,14 @@ from .AuditingAgent import AgentAuditing
 
 # Import Utils - handle both relative and absolute imports
 try:
-    from ..Utils import JsonUtils, TextProcessingUtils
+    from ..Utils import JsonUtils, TextProcessingUtils, config_loader
 except ImportError:
     import sys
     import os
     parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     if parent_dir not in sys.path:
         sys.path.insert(0, parent_dir)
-    from Utils import JsonUtils, TextProcessingUtils
+    from Utils import JsonUtils, TextProcessingUtils, config_loader
 
 
 class PIIType(Enum):
@@ -128,40 +128,86 @@ class PIIScrubbingAgent(BaseAgent):
     
     def _initialize_patterns(self):
         """Initialize and pre-compile regex patterns for different PII types for optimal performance"""
-        # Raw pattern definitions
-        raw_patterns = {
-            PIIType.SSN: [
-                r'\b\d{3}-\d{2}-\d{4}\b',  # 123-45-6789
-                r'\b\d{3}\s\d{2}\s\d{4}\b',  # 123 45 6789
-                r'\b\d{9}\b'  # 123456789 (9 consecutive digits)
-            ],
-            PIIType.CREDIT_CARD: [
-                r'\b4\d{3}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b',  # Visa
-                r'\b5[1-5]\d{2}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b',  # MasterCard
-                r'\b3[47]\d{2}[\s-]?\d{6}[\s-]?\d{5}\b',  # American Express
-                r'\b6011[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b'  # Discover
-            ],
-            PIIType.PHONE_NUMBER: [
-                r'(?<!\d)\(\d{3}\)\s?\d{3}-\d{4}(?!\d)',  # (555) 123-4567
-                r'\b\d{3}-\d{3}-\d{4}\b',  # 555-123-4567
-                r'\b\d{3}\.\d{3}\.\d{4}\b',  # 555.123.4567
-                r'\b\d{10}\b'  # 5551234567
-            ],
-            PIIType.EMAIL: [
-                r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
-            ],
-            PIIType.ACCOUNT_NUMBER: [
-                r'\b\d{8,17}\b'  # 8-17 digit account numbers
-            ],
-            PIIType.DATE_OF_BIRTH: [
-                r'\b\d{1,2}/\d{1,2}/\d{4}\b',  # MM/DD/YYYY
-                r'\b\d{1,2}-\d{1,2}-\d{4}\b',  # MM-DD-YYYY
-                r'\b\d{4}-\d{1,2}-\d{1,2}\b'   # YYYY-MM-DD
-            ],
-            PIIType.BANK_ROUTING: [
-                r'\b\d{9}\b'  # 9-digit routing numbers
-            ]
+        # Fallback pattern definitions (preserved from original hardcoded values)
+        fallback_patterns = {
+            'pii_types': {
+                'ssn': {
+                    'patterns': [
+                        r'\b\d{3}-\d{2}-\d{4}\b',  # 123-45-6789
+                        r'\b\d{3}\s\d{2}\s\d{4}\b',  # 123 45 6789
+                        r'\b\d{9}\b'  # 123456789 (9 consecutive digits)
+                    ]
+                },
+                'credit_card': {
+                    'patterns': [
+                        r'\b4\d{3}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b',  # Visa
+                        r'\b5[1-5]\d{2}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b',  # MasterCard
+                        r'\b3[47]\d{2}[\s-]?\d{6}[\s-]?\d{5}\b',  # American Express
+                        r'\b6011[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b'  # Discover
+                    ]
+                },
+                'phone_number': {
+                    'patterns': [
+                        r'(?<!\d)\(\d{3}\)\s?\d{3}-\d{4}(?!\d)',  # (555) 123-4567
+                        r'\b\d{3}-\d{3}-\d{4}\b',  # 555-123-4567
+                        r'\b\d{3}\.\d{3}\.\d{4}\b',  # 555.123.4567
+                        r'\b\d{10}\b'  # 5551234567
+                    ]
+                },
+                'email': {
+                    'patterns': [
+                        r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+                    ]
+                },
+                'account_number': {
+                    'patterns': [
+                        r'\b\d{8,17}\b'  # 8-17 digit account numbers
+                    ]
+                },
+                'date_of_birth': {
+                    'patterns': [
+                        r'\b\d{1,2}/\d{1,2}/\d{4}\b',  # MM/DD/YYYY
+                        r'\b\d{1,2}-\d{1,2}-\d{4}\b',  # MM-DD-YYYY
+                        r'\b\d{4}-\d{1,2}-\d{1,2}\b'   # YYYY-MM-DD
+                    ]
+                },
+                'bank_routing': {
+                    'patterns': [
+                        r'\b\d{9}\b'  # 9-digit routing numbers
+                    ]
+                }
+            }
         }
+        
+        # Load configuration with graceful fallback
+        try:
+            pii_config = config_loader.load_config("pii_patterns", fallback_patterns)
+            pii_types_config = pii_config.get('pii_types', fallback_patterns['pii_types'])
+            self.logger.debug("Loaded PII patterns configuration from external file")
+        except Exception as e:
+            self.logger.warning(f"Failed to load PII patterns configuration: {e}. Using fallback.")
+            pii_types_config = fallback_patterns['pii_types']
+        
+        # Convert configuration to enum-based structure for backward compatibility
+        raw_patterns = {}
+        
+        # Map configuration keys to PIIType enums
+        pii_type_mapping = {
+            'ssn': PIIType.SSN,
+            'credit_card': PIIType.CREDIT_CARD,
+            'phone_number': PIIType.PHONE_NUMBER,
+            'email': PIIType.EMAIL,
+            'account_number': PIIType.ACCOUNT_NUMBER,
+            'date_of_birth': PIIType.DATE_OF_BIRTH,
+            'bank_routing': PIIType.BANK_ROUTING,
+            'driver_license': PIIType.DRIVER_LICENSE,
+            'passport': PIIType.PASSPORT
+        }
+        
+        # Convert external configuration to internal format
+        for config_key, pii_type in pii_type_mapping.items():
+            if config_key in pii_types_config:
+                raw_patterns[pii_type] = pii_types_config[config_key]['patterns']
         
         # Pre-compile all patterns for significant performance improvement
         self.compiled_patterns: Dict[PIIType, List[Tuple[Pattern[str], str]]] = {}
@@ -190,24 +236,88 @@ class PIIScrubbingAgent(BaseAgent):
         self.logger.info(f"Pre-compiled {total_patterns} PII regex patterns for optimal performance")
     
     def _initialize_context_config(self):
-        """Initialize context-specific PII handling configurations"""
-        self.context_configs = {
-            PIIContext.FINANCIAL: {
-                'priority_types': [PIIType.SSN, PIIType.CREDIT_CARD, PIIType.ACCOUNT_NUMBER, PIIType.BANK_ROUTING],
-                'default_strategy': MaskingStrategy.TOKENIZE,
-                'require_full_audit': True
-            },
-            PIIContext.HEALTHCARE: {
-                'priority_types': [PIIType.SSN, PIIType.DATE_OF_BIRTH, PIIType.PHONE_NUMBER],
-                'default_strategy': MaskingStrategy.HASH,
-                'require_full_audit': True
-            },
-            PIIContext.GENERAL: {
-                'priority_types': [PIIType.EMAIL, PIIType.PHONE_NUMBER, PIIType.SSN],
-                'default_strategy': MaskingStrategy.PARTIAL_MASK,
-                'require_full_audit': False
+        """Initialize context-specific PII handling configurations using external config with fallback"""
+        # Fallback context configurations (preserved from original hardcoded values)
+        fallback_context_configs = {
+            'context_configs': {
+                'financial': {
+                    'priority_types': ['ssn', 'credit_card', 'account_number', 'bank_routing'],
+                    'default_strategy': 'tokenize',
+                    'require_full_audit': True
+                },
+                'healthcare': {
+                    'priority_types': ['ssn', 'date_of_birth', 'phone_number'],
+                    'default_strategy': 'hash',
+                    'require_full_audit': True
+                },
+                'general': {
+                    'priority_types': ['email', 'phone_number', 'ssn'],
+                    'default_strategy': 'partial_mask',
+                    'require_full_audit': False
+                }
             }
         }
+        
+        # Load configuration with graceful fallback
+        try:
+            pii_config = config_loader.load_config("pii_patterns", fallback_context_configs)
+            context_configs_raw = pii_config.get('context_configs', fallback_context_configs['context_configs'])
+        except Exception as e:
+            self.logger.warning(f"Failed to load context configurations: {e}. Using fallback.")
+            context_configs_raw = fallback_context_configs['context_configs']
+        
+        # Convert external configuration to internal format
+        self.context_configs = {}
+        
+        # Map configuration keys to enum types
+        context_mapping = {
+            'financial': PIIContext.FINANCIAL,
+            'healthcare': PIIContext.HEALTHCARE,
+            'general': PIIContext.GENERAL,
+            'legal': PIIContext.LEGAL,
+            'government': PIIContext.GOVERNMENT
+        }
+        
+        pii_type_mapping = {
+            'ssn': PIIType.SSN,
+            'credit_card': PIIType.CREDIT_CARD,
+            'phone_number': PIIType.PHONE_NUMBER,
+            'email': PIIType.EMAIL,
+            'account_number': PIIType.ACCOUNT_NUMBER,
+            'date_of_birth': PIIType.DATE_OF_BIRTH,
+            'bank_routing': PIIType.BANK_ROUTING,
+            'driver_license': PIIType.DRIVER_LICENSE,
+            'passport': PIIType.PASSPORT
+        }
+        
+        strategy_mapping = {
+            'full_mask': MaskingStrategy.FULL_MASK,
+            'partial_mask': MaskingStrategy.PARTIAL_MASK,
+            'tokenize': MaskingStrategy.TOKENIZE,
+            'hash': MaskingStrategy.HASH,
+            'remove': MaskingStrategy.REMOVE
+        }
+        
+        # Convert configurations
+        for config_key, context_enum in context_mapping.items():
+            if config_key in context_configs_raw:
+                config = context_configs_raw[config_key]
+                
+                # Convert priority types from strings to enums
+                priority_types = []
+                for pii_type_str in config.get('priority_types', []):
+                    if pii_type_str in pii_type_mapping:
+                        priority_types.append(pii_type_mapping[pii_type_str])
+                
+                # Convert strategy from string to enum
+                strategy_str = config.get('default_strategy', 'partial_mask')
+                strategy = strategy_mapping.get(strategy_str, MaskingStrategy.PARTIAL_MASK)
+                
+                self.context_configs[context_enum] = {
+                    'priority_types': priority_types,
+                    'default_strategy': strategy,
+                    'require_full_audit': config.get('require_full_audit', False)
+                }
     
     def _prepare_input_data(self, data: Union[str, Dict[str, Any]]) -> tuple[str, bool]:
         """

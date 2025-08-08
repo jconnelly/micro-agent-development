@@ -7,6 +7,17 @@ from typing import Dict, Any, List, Optional
 from .BaseAgent import BaseAgent
 from .AuditingAgent import AgentAuditing, AuditLevel
 
+# Import Utils - handle both relative and absolute imports
+try:
+    from ..Utils import config_loader
+except ImportError:
+    import sys
+    import os
+    parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if parent_dir not in sys.path:
+        sys.path.insert(0, parent_dir)
+    from Utils import config_loader
+
 class RuleDocumentationAgent(BaseAgent):
     def __init__(self, llm_client: Any, audit_system: AgentAuditing, agent_id: str = None, 
                  log_level: int = 0, model_name: str = "gemini-1.5-flash", llm_provider: str = "google"):
@@ -60,39 +71,52 @@ class RuleDocumentationAgent(BaseAgent):
         """
         Classifies the business domain based on extracted rules content.
         Returns domain information with primary domain, keywords, and confidence scores.
+        Uses external configuration with fallback to hardcoded values.
         """
-        domain_keywords = {
-            'insurance': {
-                'keywords': ['policy', 'premium', 'coverage', 'beneficiary', 'accident', 'smoker', 'dui', 
-                           'vehicle', 'life insurance', 'auto insurance', 'claim', 'deductible', 'underwriting'],
-                'weight': 1.0
-            },
-            'trading': {
-                'keywords': ['trade', 'position', 'margin', 'leverage', 'portfolio', 'volatility', 'order',
-                           'risk', 'trader', 'execution', 'market', 'liquidity', 'hedge', 'derivative'],
-                'weight': 1.0
-            },
-            'lending': {
-                'keywords': ['loan', 'credit score', 'dti', 'debt', 'income', 'collateral', 'interest rate',
-                           'mortgage', 'approval', 'borrower', 'refinance', 'amortization'],
-                'weight': 1.0
-            },
-            'banking': {
-                'keywords': ['account', 'deposit', 'balance', 'transaction', 'withdrawal', 'overdraft',
-                           'fee', 'branch', 'atm', 'wire transfer', 'routing'],
-                'weight': 1.0
-            },
-            'healthcare': {
-                'keywords': ['patient', 'diagnosis', 'treatment', 'medication', 'doctor', 'hospital',
-                           'medical', 'prescription', 'therapy', 'clinic', 'procedure'],
-                'weight': 1.0
-            },
-            'ecommerce': {
-                'keywords': ['order', 'customer', 'product', 'payment', 'shipping', 'inventory',
-                           'cart', 'checkout', 'refund', 'discount', 'catalog'],
-                'weight': 1.0
+        # Fallback configuration (preserved from original hardcoded values)
+        fallback_domain_keywords = {
+            'domains': {
+                'insurance': {
+                    'keywords': ['policy', 'premium', 'coverage', 'beneficiary', 'accident', 'smoker', 'dui', 
+                               'vehicle', 'life insurance', 'auto insurance', 'claim', 'deductible', 'underwriting'],
+                    'weight': 1.0
+                },
+                'trading': {
+                    'keywords': ['trade', 'position', 'margin', 'leverage', 'portfolio', 'volatility', 'order',
+                               'risk', 'trader', 'execution', 'market', 'liquidity', 'hedge', 'derivative'],
+                    'weight': 1.0
+                },
+                'lending': {
+                    'keywords': ['loan', 'credit score', 'dti', 'debt', 'income', 'collateral', 'interest rate',
+                               'mortgage', 'approval', 'borrower', 'refinance', 'amortization'],
+                    'weight': 1.0
+                },
+                'banking': {
+                    'keywords': ['account', 'deposit', 'balance', 'transaction', 'withdrawal', 'overdraft',
+                               'fee', 'branch', 'atm', 'wire transfer', 'routing'],
+                    'weight': 1.0
+                },
+                'healthcare': {
+                    'keywords': ['patient', 'diagnosis', 'treatment', 'medication', 'doctor', 'hospital',
+                               'medical', 'prescription', 'therapy', 'clinic', 'procedure'],
+                    'weight': 1.0
+                },
+                'ecommerce': {
+                    'keywords': ['order', 'customer', 'product', 'payment', 'shipping', 'inventory',
+                               'cart', 'checkout', 'refund', 'discount', 'catalog'],
+                    'weight': 1.0
+                }
             }
         }
+        
+        # Load configuration with graceful fallback
+        try:
+            domains_config = config_loader.load_config("domains", fallback_domain_keywords)
+            domain_keywords = domains_config.get('domains', fallback_domain_keywords['domains'])
+            self.logger.debug("Loaded domain classification configuration from external file")
+        except Exception as e:
+            self.logger.warning(f"Failed to load domains configuration: {e}. Using fallback.")
+            domain_keywords = fallback_domain_keywords['domains']
         
         domain_scores = {domain: 0 for domain in domain_keywords.keys()}
         total_text = ""

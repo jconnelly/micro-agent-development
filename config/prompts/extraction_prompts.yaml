@@ -1,0 +1,168 @@
+# LLM Prompt Templates for Rule Extraction
+# Used by LegacyRuleExtractionAndTranslatorAgent for business rule extraction from legacy code
+#
+# Templates support variable substitution using {variable_name} syntax
+# Available variables depend on the specific prompt context
+
+extraction_prompts:
+  
+  # Main system prompt for rule extraction
+  system_prompt:
+    description: "Core system prompt that defines the agent's role and capabilities"
+    template: |
+      You are an expert business rule extraction and translation agent. 
+      Your task is to analyze legacy code snippets, identify embedded business rules, 
+      separate them from technical implementation details, and translate any cryptic 
+      technical terminology into clear, business-friendly language. 
+      Output the extracted rules in a structured JSON array format, where each rule 
+      contains 'conditions', 'actions', and 'business_description' fields.
+    variables: []
+    
+  # Main user prompt for rule extraction  
+  user_prompt:
+    description: "Core user prompt with instructions for analyzing code"
+    template: |
+      Analyze the following legacy code snippet and extract all explicit and implicit 
+      business rules. For each rule, provide its conditions, actions, a clear 
+      business description, and the relevant lines from the source code. 
+      Translate any technical terms into business language. 
+      If no business rules are found, return an empty array.
+
+      Legacy Code:
+      ```
+      {code_snippet}
+      ```
+
+      Provide output in JSON format as an array of rules:
+      [
+        {{
+          "conditions": "...",
+          "actions": "...", 
+          "business_description": "...",
+          "source_lines": "..."
+        }}
+      ]
+    variables:
+      - code_snippet
+      
+  # Context-aware user prompt (with additional context)
+  user_prompt_with_context:
+    description: "Enhanced user prompt that includes file context for better analysis"
+    template: |
+      Consider the following context: {context}
+
+      Analyze the following legacy code snippet and extract all explicit and implicit 
+      business rules. For each rule, provide its conditions, actions, a clear 
+      business description, and the relevant lines from the source code. 
+      Translate any technical terms into business language. 
+      If no business rules are found, return an empty array.
+
+      Legacy Code:
+      ```
+      {code_snippet}
+      ```
+
+      Provide output in JSON format as an array of rules:
+      [
+        {{
+          "conditions": "...",
+          "actions": "...", 
+          "business_description": "...",
+          "source_lines": "..."
+        }}
+      ]
+    variables:
+      - context
+      - code_snippet
+      
+  # Chunk processing prompt for large files
+  chunk_prompt_prefix:
+    description: "Prefix added to prompts when processing file chunks"
+    template: |
+      This is chunk {chunk_number} of {total_chunks} from a larger file.
+      Focus on extracting complete business rules from this chunk.
+      Context from file beginning: {file_context}
+      
+    variables:
+      - chunk_number
+      - total_chunks  
+      - file_context
+      
+# Output format specifications
+output_formats:
+  
+  # Standard JSON rule format
+  standard_rule:
+    description: "Standard JSON structure for extracted business rules"
+    required_fields:
+      - conditions: "The logical conditions that trigger this rule"
+      - actions: "The actions or outcomes when conditions are met"
+      - business_description: "Human-readable description in business terms"
+      - source_lines: "Relevant source code lines (optional)"
+    optional_fields:
+      - confidence: "Confidence score 0.0-1.0 (optional)"
+      - domain: "Business domain classification (optional)"
+      - complexity: "Rule complexity level (optional)"
+      
+  # Extended rule format with metadata
+  extended_rule:
+    description: "Extended JSON structure with additional metadata"
+    required_fields:
+      - conditions: "The logical conditions that trigger this rule"
+      - actions: "The actions or outcomes when conditions are met" 
+      - business_description: "Human-readable description in business terms"
+      - source_lines: "Relevant source code lines"
+      - rule_id: "Unique identifier for the rule"
+      - extraction_metadata: "Metadata about the extraction process"
+    
+# Domain-specific prompt variations
+domain_variations:
+  
+  financial:
+    description: "Specialized prompts for financial services code"
+    system_prompt_suffix: |
+      Pay special attention to financial calculations, risk assessments, 
+      compliance rules, and regulatory requirements. Focus on monetary thresholds, 
+      interest calculations, and approval workflows.
+    domain_keywords:
+      - loan, credit, interest, principal, payment
+      - risk, compliance, regulation, audit
+      - account, balance, transaction, settlement
+      
+  insurance:
+    description: "Specialized prompts for insurance domain code"  
+    system_prompt_suffix: |
+      Focus on policy rules, coverage conditions, claim processing logic,
+      underwriting criteria, and premium calculations. Identify risk factors
+      and eligibility requirements.
+    domain_keywords:
+      - policy, coverage, premium, deductible
+      - claim, underwriting, risk, eligibility
+      - beneficiary, accident, liability
+      
+  healthcare:
+    description: "Specialized prompts for healthcare systems"
+    system_prompt_suffix: |
+      Look for patient eligibility rules, treatment protocols, dosage calculations,
+      and compliance with healthcare regulations. Focus on safety checks and
+      medical decision support logic.
+    domain_keywords:
+      - patient, diagnosis, treatment, medication
+      - dosage, protocol, eligibility, safety
+      - medical, clinical, healthcare
+
+# Processing configuration
+processing_config:
+  max_chunk_size: 175         # Maximum lines before switching to chunk processing
+  chunk_overlap: 20           # Lines of overlap between chunks  
+  context_lines: 50           # Maximum context lines to include
+  min_chunk_size: 10          # Minimum viable chunk size
+  
+# Template metadata
+metadata:
+  version: "1.0.0"
+  last_updated: "2025-01-08"
+  description: "LLM prompt templates for business rule extraction from legacy code"
+  total_prompts: 4
+  supported_domains: ["financial", "insurance", "healthcare", "general"]
+  template_engine: "python_str_format"  # Uses {variable} syntax

@@ -15,9 +15,10 @@ from datetime import datetime, timezone
 from .Logger import AgentLogger
 from .AuditingAgent import AgentAuditing
 
-# Import Utils - handle both relative and absolute imports
+# Import Utils and config loader - handle both relative and absolute imports
 try:
     from ..Utils import RequestIdGenerator, TimeUtils
+    from ..Utils.config_loader import get_config_loader
 except ImportError:
     import sys
     import os
@@ -26,6 +27,7 @@ except ImportError:
     if parent_dir not in sys.path:
         sys.path.insert(0, parent_dir)
     from Utils import RequestIdGenerator, TimeUtils
+    from Utils.config_loader import get_config_loader
 
 
 class BaseAgent(ABC):
@@ -84,14 +86,87 @@ class BaseAgent(ABC):
             agent_name=agent_name
         )
         
-        # Common configuration constants
-        self.API_DELAY_SECONDS = 1.0
-        self.API_TIMEOUT_SECONDS = 30.0
-        self.MAX_RETRIES = 3
-        self.TOTAL_OPERATION_TIMEOUT = 300.0  # 5 minutes
+        # Load configuration with graceful fallback
+        self._load_agent_configuration()
         
         # Cache for expensive operations
         self._ip_address_cache = None
+        
+    def _load_agent_configuration(self) -> None:
+        """
+        Load agent configuration from external files with graceful fallback to defaults.
+        
+        Loads configuration from agent_defaults.yaml and applies agent-specific overrides.
+        Falls back to hardcoded defaults if configuration loading fails.
+        """
+        # Hardcoded fallback configuration
+        fallback_config = {
+            'agent_defaults': {
+                'api_settings': {
+                    'timeout_seconds': 30.0,
+                    'max_retries': 3,
+                    'total_operation_timeout': 300.0,
+                    'retry_backoff_base': 2.0,
+                    'retry_backoff_max': 16.0
+                },
+                'caching': {
+                    'default_lru_cache_size': 128,
+                    'ip_resolution_cache_ttl': 300
+                },
+                'processing_limits': {
+                    'max_file_chunks': 50,
+                    'min_chunk_lines': 10,
+                    'chunking_line_threshold': 175
+                }
+            }
+        }
+        
+        try:
+            config_loader = get_config_loader()
+            agent_config = config_loader.load_config("agent_defaults", fallback_config)
+            
+            # Extract API settings
+            api_settings = agent_config['agent_defaults']['api_settings']
+            self.API_TIMEOUT_SECONDS = float(api_settings.get('timeout_seconds', 30.0))
+            self.MAX_RETRIES = int(api_settings.get('max_retries', 3))
+            self.TOTAL_OPERATION_TIMEOUT = float(api_settings.get('total_operation_timeout', 300.0))
+            self.API_DELAY_SECONDS = 1.0  # Keep default for now
+            
+            # Store config for subclasses
+            self._agent_config = agent_config
+            
+            self.logger.debug(f"Loaded agent configuration from external file")
+            
+        except Exception as e:
+            self.logger.warning(f"Failed to load agent configuration: {e}. Using fallback.")
+            # Use hardcoded fallback values
+            self.API_TIMEOUT_SECONDS = 30.0
+            self.MAX_RETRIES = 3
+            self.TOTAL_OPERATION_TIMEOUT = 300.0
+            self.API_DELAY_SECONDS = 1.0
+            self._agent_config = fallback_config
+    
+    def get_agent_config(self, path: str = None) -> Dict[str, Any]:
+        """
+        Get agent configuration value by path.
+        
+        Args:
+            path: Dot-separated path to config value (e.g., 'api_settings.timeout_seconds')
+                 If None, returns the entire config
+                 
+        Returns:
+            Configuration value or entire config dict
+        """
+        if path is None:
+            return self._agent_config
+            
+        config = self._agent_config
+        for key in path.split('.'):
+            if isinstance(config, dict) and key in config:
+                config = config[key]
+            else:
+                return None
+        return config
         
     def get_ip_address(self) -> str:
         """
