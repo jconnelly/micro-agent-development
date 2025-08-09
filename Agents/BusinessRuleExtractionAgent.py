@@ -132,27 +132,28 @@ class BusinessRuleExtractionAgent(BaseAgent):
     API_TIMEOUT_SECONDS = 30
     TOTAL_OPERATION_TIMEOUT = 600  # 10 minutes
     
-    def __init__(self, llm_client: Any, audit_system: ComplianceMonitoringAgent, agent_id: str = None, 
-                 log_level: int = 0, model_name: str = "unknown", llm_provider: str = "unknown"):
+    def __init__(self, audit_system: ComplianceMonitoringAgent, llm_client: Any = None, 
+                 agent_id: str = None, log_level: int = 0, model_name: str = None, 
+                 llm_provider = None):
         """
-        Initializes the LegacyRuleExtractionAgent.
+        Initialize the BusinessRuleExtractionAgent with BYO-LLM support.
 
         Args:
-            llm_client: An initialized LLM client (e.g., genai.Client()).
-            audit_system: An instance of the AgentAuditing class.
+            audit_system: An instance of the ComplianceMonitoringAgent for auditing.
+            llm_client: (Legacy) An initialized LLM client - deprecated, use llm_provider instead.
             agent_id: Unique identifier for this agent instance.
             log_level: 0 = production (silent), 1 = development (verbose)
-            model_name: Name of the LLM model being used (e.g., "gemini-1.5-flash", "gpt-4")
-            llm_provider: Provider of the LLM (e.g., "google", "openai", "anthropic")
+            model_name: Name of the LLM model being used (optional, inferred from provider)
+            llm_provider: LLM provider instance or provider type string (defaults to Gemini)
         """
-        # Initialize base agent
+        # Initialize base agent with BYO-LLM support
         super().__init__(
             audit_system=audit_system,
             agent_id=agent_id,
             log_level=log_level,
             model_name=model_name,
             llm_provider=llm_provider,
-            agent_name="Legacy Rule Extraction and Translator Agent"
+            agent_name="BusinessRuleExtractionAgent"
         )
         
         # Rule extraction specific configuration

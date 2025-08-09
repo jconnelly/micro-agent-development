@@ -32,6 +32,18 @@ The Micro-Agent Development Platform is a comprehensive, production-ready suite 
     - Complete audit trails for regulatory reporting
     - Risk mitigation through automated documentation
 
+=== "BYO-LLM Flexibility"
+    
+    **🆕 Bring Your Own LLM**
+    
+    - Support for OpenAI GPT, Anthropic Claude, Google Gemini, Azure OpenAI
+    - Cost optimization through provider switching
+    - Enterprise compliance with preferred LLM vendors
+    - Vendor independence and negotiating power
+    - Custom and fine-tuned model integration
+    
+    **[Learn More →](guides/byo-llm-configuration.md)**
+
 === "Operational Efficiency"
     
     **Process Automation**
@@ -50,17 +62,6 @@ The Micro-Agent Development Platform is a comprehensive, production-ready suite 
     - Multi-format output (Markdown, HTML, JSON, PDF)
     - Enterprise authentication and monitoring support
 
-=== "BYO-LLM Flexibility"
-    
-    **🆕 Bring Your Own LLM**
-    
-    - Support for OpenAI GPT, Anthropic Claude, Google Gemini, Azure OpenAI
-    - Cost optimization through provider switching
-    - Enterprise compliance with preferred LLM vendors
-    - Vendor independence and negotiating power
-    - Custom and fine-tuned model integration
-    
-    **[Learn More →](guides/byo-llm-configuration.md)**
 
 ---
 

@@ -180,30 +180,30 @@ class AdvancedDocumentationAgent(RuleDocumentationGeneratorAgent):
         stakeholder communications and project documentation.
     """
     
-    def __init__(self, llm_client, audit_system, agent_id: str = None, log_level: int = 0, 
-                 model_name: str = "gemini-1.5-flash", llm_provider: str = "google",
-                 write_tool: Optional[Callable] = None):
+    def __init__(self, audit_system: ComplianceMonitoringAgent, llm_client = None, 
+                 agent_id: str = None, log_level: int = 0, model_name: str = None,
+                 llm_provider = None, write_tool: Optional[Callable] = None):
         """
-        Initialize the tool-integrated documentation agent.
+        Initialize the AdvancedDocumentationAgent with BYO-LLM support.
         
         Args:
-            llm_client: An initialized LLM client
-            audit_system: The auditing system instance
+            audit_system: An instance of the ComplianceMonitoringAgent for auditing.
+            llm_client: (Legacy) An initialized LLM client - deprecated, use llm_provider instead.
             agent_id: Unique identifier for this agent instance
             log_level: Logging verbosity level
-            model_name: LLM model name
-            llm_provider: LLM provider name
+            model_name: Name of the LLM model being used (optional, inferred from provider)
+            llm_provider: LLM provider instance or provider type string (defaults to Gemini)
             write_tool: Claude Code Write tool function (injected for testing)
         """
         super().__init__(
-            llm_client=llm_client,
             audit_system=audit_system,
             agent_id=agent_id,
             log_level=log_level,
             model_name=model_name,
-            llm_provider=llm_provider
+            llm_provider=llm_provider,
+            agent_name="AdvancedDocumentationAgent"
         )
-        self.agent_name = "Tool-Integrated Documentation Agent"
+        self.llm_client = llm_client
         self.write_tool = write_tool
         
     def get_agent_info(self) -> Dict[str, Any]:

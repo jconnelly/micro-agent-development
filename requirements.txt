@@ -4,8 +4,15 @@
 PyYAML>=6.0.1          # YAML configuration file parsing
 python-dotenv>=1.0.0    # Environment variable management
 
-# Google AI/LLM Dependencies  
+# Flask Web Framework Dependencies
+Flask>=3.0.0           # Web framework for REST API
+Flask-CORS>=4.0.0      # Cross-Origin Resource Sharing support
+Werkzeug>=3.0.0        # WSGI utilities for Flask
+
+# LLM Provider Dependencies
 google-generativeai>=0.3.0  # Google Gemini API integration
+openai>=1.0.0          # OpenAI GPT models API
+anthropic>=0.7.0       # Anthropic Claude API
 
 # Documentation Dependencies
 mkdocs>=1.6.0            # Static site generator for documentation

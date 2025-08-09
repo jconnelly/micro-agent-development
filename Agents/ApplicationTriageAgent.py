@@ -143,30 +143,31 @@ class ApplicationTriageAgent(BaseAgent):
         communications and enterprise documentation.
     """
     
-    def __init__(self, llm_client: Any, audit_system: ComplianceMonitoringAgent, agent_id: str = None,
-                 log_level: int = 0, model_name: str = "unknown", llm_provider: str = "unknown",
-                 enable_pii_scrubbing: bool = True, pii_masking_strategy: MaskingStrategy = MaskingStrategy.TOKENIZE):
+    def __init__(self, audit_system: ComplianceMonitoringAgent, llm_client: Any = None, 
+                 agent_id: str = None, log_level: int = 0, model_name: str = None,
+                 llm_provider = None, enable_pii_scrubbing: bool = True, 
+                 pii_masking_strategy: MaskingStrategy = MaskingStrategy.TOKENIZE):
         """
-        Initializes the IntelligentSubmissionTriageAgent.
+        Initialize the ApplicationTriageAgent with BYO-LLM support.
 
         Args:
-            llm_client: An initialized LLM client (e.g., OpenAI, LangChain).
-            audit_system: An instance of the AgentAuditing class.
+            audit_system: An instance of the ComplianceMonitoringAgent for auditing.
+            llm_client: (Legacy) An initialized LLM client - deprecated, use llm_provider instead.
             agent_id: Unique identifier for this agent instance.
             log_level: 0 = production (silent), 1 = development (verbose)
-            model_name: Name of the LLM model being used (e.g., "gpt-4", "claude-3-sonnet")
-            llm_provider: Provider of the LLM (e.g., "openai", "anthropic", "google")
+            model_name: Name of the LLM model being used (optional, inferred from provider)
+            llm_provider: LLM provider instance or provider type string (defaults to Gemini)
             enable_pii_scrubbing: Whether to enable PII scrubbing before sending to LLM
             pii_masking_strategy: Strategy for masking detected PII
         """
-        # Initialize base agent
+        # Initialize base agent with BYO-LLM support
         super().__init__(
             audit_system=audit_system,
             agent_id=agent_id,
             log_level=log_level,
             model_name=model_name,
             llm_provider=llm_provider,
-            agent_name="Intelligent Submission Triage Agent"
+            agent_name="ApplicationTriageAgent"
         )
         
         # Triage-specific configuration

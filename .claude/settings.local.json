@@ -8,7 +8,11 @@
       "Bash(cp:*)",
       "Bash(mkdocs build:*)",
       "Bash(mv:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(pip install:*)",
+      "Bash(set FLASK_ENV=development)",
+      "Bash(timeout:*)"
     ],
     "deny": []
   }
