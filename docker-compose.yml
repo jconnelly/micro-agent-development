@@ -1,0 +1,160 @@
+# Docker Compose for Micro-Agent Development Platform
+# Supports both development and production deployments
+
+version: '3.8'
+
+services:
+  # =============================================================================
+  # Micro-Agent API Service
+  # =============================================================================
+  micro-agent-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: micro-agent-api
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-8000}:8000"
+    environment:
+      # Flask Configuration
+      - FLASK_ENV=${FLASK_ENV:-production}
+      - FLASK_DEBUG=${FLASK_DEBUG:-0}
+      
+      # API Configuration
+      - API_KEY=${API_KEY:-development-key-change-in-production}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:8080}
+      
+      # LLM Provider Configuration
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
+      
+      # Logging Configuration
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - AUDIT_LOG_LEVEL=${AUDIT_LOG_LEVEL:-2}
+      
+      # Performance Configuration
+      - WORKERS=${WORKERS:-4}
+      - WORKER_TIMEOUT=${WORKER_TIMEOUT:-120}
+      - MAX_REQUESTS=${MAX_REQUESTS:-1000}
+    volumes:
+      # Logs volume for persistent logging
+      - micro-agent-logs:/app/logs
+      # Configuration volume (optional)
+      - ./config:/app/config:ro
+    networks:
+      - micro-agent-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.micro-agent.rule=Host(`api.micro-agents.local`)"
+      - "traefik.http.routers.micro-agent.tls=true"
+      - "traefik.http.services.micro-agent.loadbalancer.server.port=8000"
+
+  # =============================================================================
+  # Redis Cache (Optional - for enhanced performance)
+  # =============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: micro-agent-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-development-password}
+    volumes:
+      - micro-agent-redis-data:/data
+    networks:
+      - micro-agent-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    profiles:
+      - cache
+      - full
+
+  # =============================================================================
+  # Monitoring Stack (Optional)
+  # =============================================================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: micro-agent-prometheus
+    restart: unless-stopped
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - micro-agent-prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - micro-agent-network
+    profiles:
+      - monitoring
+      - full
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: micro-agent-grafana
+    restart: unless-stopped
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - micro-agent-grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - micro-agent-network
+    profiles:
+      - monitoring
+      - full
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  micro-agent-network:
+    driver: bridge
+    labels:
+      description: "Network for Micro-Agent Development Platform services"
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  micro-agent-logs:
+    driver: local
+    labels:
+      description: "Persistent storage for application logs"
+      
+  micro-agent-redis-data:
+    driver: local
+    labels:
+      description: "Redis cache data persistence"
+      
+  micro-agent-prometheus-data:
+    driver: local
+    labels:
+      description: "Prometheus metrics data persistence"
+      
+  micro-agent-grafana-data:
+    driver: local
+    labels:
+      description: "Grafana dashboard and configuration data"

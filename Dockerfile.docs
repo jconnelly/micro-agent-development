@@ -1,0 +1,70 @@
+# Documentation Dockerfile for Micro-Agent Development Platform
+# Builds and serves the MkDocs documentation
+
+FROM python:3.11-slim as docs-base
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+# Install system dependencies for documentation
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN groupadd --gid 1000 docsuser && \
+    useradd --uid 1000 --gid docsuser --shell /bin/bash --create-home docsuser
+
+WORKDIR /app
+
+# Install documentation dependencies
+COPY requirements.txt .
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# =============================================================================
+# Development Documentation Stage
+# =============================================================================
+FROM docs-base as docs-development
+
+# Copy documentation source
+COPY --chown=docsuser:docsuser . .
+
+# Switch to non-root user
+USER docsuser
+
+# Expose documentation port
+EXPOSE 8000
+
+# Development command with live reload
+CMD ["mkdocs", "serve", "--dev-addr", "0.0.0.0:8000", "--config-file", "config/mkdocs.yml"]
+
+# =============================================================================
+# Production Documentation Stage
+# =============================================================================
+FROM docs-base as docs-production
+
+# Copy documentation source
+COPY --chown=docsuser:docsuser . .
+
+# Build documentation
+RUN mkdocs build --config-file config/mkdocs.yml --site-dir /app/site
+
+# Use nginx for serving static documentation
+FROM nginx:alpine as docs-final
+
+# Copy built documentation
+COPY --from=docs-production /app/site /usr/share/nginx/html
+
+# Copy nginx configuration
+COPY docker/nginx.conf /etc/nginx/nginx.conf
+
+# Expose port 80
+EXPOSE 80
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:80/ || exit 1
+
+CMD ["nginx", "-g", "daemon off;"]

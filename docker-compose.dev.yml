@@ -1,0 +1,103 @@
+# Docker Compose for Development Environment
+# Optimized for development with hot reloading and debugging support
+
+version: '3.8'
+
+services:
+  # =============================================================================
+  # Development API Service
+  # =============================================================================
+  micro-agent-api-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: micro-agent-api-dev
+    restart: unless-stopped
+    ports:
+      - "${DEV_API_PORT:-5000}:5000"
+    environment:
+      # Flask Development Configuration
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - FLASK_APP=app.py
+      
+      # API Configuration
+      - API_KEY=development-key-no-auth-required
+      - CORS_ORIGINS=*
+      
+      # LLM Provider Configuration (use .env file)
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
+      
+      # Development Settings
+      - LOG_LEVEL=DEBUG
+      - AUDIT_LOG_LEVEL=1
+      - PYTHONPATH=/app
+    volumes:
+      # Mount source code for hot reloading
+      - .:/app
+      - /app/__pycache__
+      - /app/.git
+    networks:
+      - micro-agent-dev-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 2
+      start_period: 10s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.micro-agent-dev.rule=Host(`dev.micro-agents.local`)"
+      - "traefik.http.services.micro-agent-dev.loadbalancer.server.port=5000"
+
+  # =============================================================================
+  # Development Documentation Server
+  # =============================================================================
+  docs-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.docs
+      target: docs-development
+    container_name: micro-agent-docs-dev
+    restart: unless-stopped
+    ports:
+      - "${DOCS_PORT:-8001}:8000"
+    volumes:
+      - .:/app
+    networks:
+      - micro-agent-dev-network
+    profiles:
+      - docs
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.micro-agent-docs.rule=Host(`docs.micro-agents.local`)"
+      - "traefik.http.services.micro-agent-docs.loadbalancer.server.port=8000"
+
+  # =============================================================================
+  # Development Redis (Lightweight)
+  # =============================================================================
+  redis-dev:
+    image: redis:7-alpine
+    container_name: micro-agent-redis-dev
+    restart: unless-stopped
+    ports:
+      - "${REDIS_DEV_PORT:-6380}:6379"
+    command: redis-server --appendonly no --save ""
+    networks:
+      - micro-agent-dev-network
+    profiles:
+      - cache
+
+# =============================================================================
+# Development Networks
+# =============================================================================
+networks:
+  micro-agent-dev-network:
+    driver: bridge
+    labels:
+      description: "Development network for Micro-Agent platform"

@@ -1,0 +1,65 @@
+# Development Dependencies for Micro-Agent Development Platform
+# Install with: pip install -r requirements-dev.txt
+
+# Testing Framework
+pytest>=7.4.0                    # Testing framework
+pytest-cov>=4.1.0                # Coverage reporting
+pytest-mock>=3.11.0              # Mocking utilities
+pytest-asyncio>=0.21.0           # Async testing support
+pytest-xdist>=3.3.0              # Parallel test execution
+
+# Code Quality
+black>=23.7.0                    # Code formatting
+isort>=5.12.0                    # Import sorting
+flake8>=6.0.0                    # Linting
+mypy>=1.5.0                      # Type checking
+pylint>=2.17.0                   # Advanced linting
+bandit>=1.7.5                    # Security linting
+
+# Development Tools
+pre-commit>=3.3.0                # Git hooks for code quality
+ipython>=8.14.0                  # Interactive Python shell
+jupyter>=1.0.0                   # Jupyter notebooks for experimentation
+ipdb>=0.13.13                    # Interactive debugger
+
+# HTTP Testing
+httpx>=0.24.0                    # Modern HTTP client for testing
+requests-mock>=1.11.0            # HTTP request mocking
+
+# Performance Profiling
+py-spy>=0.3.14                   # Profiling tool
+memory-profiler>=0.61.0          # Memory usage profiling
+line-profiler>=4.1.0             # Line-by-line profiling
+
+# Database Testing (if needed)
+fakeredis>=2.18.0                # Redis mocking for tests
+pytest-postgresql>=5.0.0         # PostgreSQL testing utilities
+
+# Documentation Testing
+pytest-doctestplus>=1.0.0        # Enhanced doctest support
+sphinx>=7.1.0                    # Documentation generation (alternative to MkDocs)
+
+# Load Testing
+locust>=2.16.0                   # Load testing framework
+
+# Development Utilities
+python-dotenv>=1.0.0             # Environment variable management (if not in main requirements)
+watchdog>=3.0.0                  # File system monitoring for auto-reload
+rich>=13.5.0                     # Rich text and beautiful formatting in terminal
+
+# Flask Development Extensions
+Flask-DebugToolbar>=0.13.0       # Flask debugging toolbar
+Flask-Testing>=0.8.1             # Flask testing utilities
+
+# API Testing
+tavern>=2.4.0                    # API testing framework
+pytest-html>=3.2.0               # HTML test reports
+
+# Mock Services
+responses>=0.23.0                # HTTP response mocking
+freezegun>=1.2.0                 # Time/date mocking
+factory-boy>=3.3.0               # Test data generation
+
+# Security Testing
+safety>=2.3.0                    # Dependency vulnerability checking
+pip-audit>=2.6.0                 # Alternative security scanner

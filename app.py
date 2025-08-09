@@ -50,6 +50,7 @@ try:
     from Utils.request_utils import RequestIdGenerator
     from Utils.time_utils import TimeUtils
     from Utils.config_loader import get_config_loader
+    from api_docs import api_blueprint  # Import API documentation blueprint
 except ImportError as e:
     print(f"Error importing required modules: {e}")
     sys.exit(1)
@@ -72,6 +73,9 @@ CORS(app,
      allow_headers=['Content-Type', 'Authorization', 'X-API-Key', 'X-Request-ID'],
      expose_headers=['X-Request-ID', 'X-Processing-Time-Ms'],
      max_age=86400)  # Cache preflight requests for 24 hours
+
+# Register API documentation blueprint
+app.register_blueprint(api_blueprint, url_prefix='/api/v1')
 
 # Configure logging
 logging.basicConfig(
@@ -971,74 +975,73 @@ def enterprise_data_privacy():
         ), 500
 
 
-# API documentation endpoint
+# API documentation redirect endpoint
 @app.route('/api/v1/docs', methods=['GET'])
-def api_docs():
-    """Basic API documentation endpoint."""
+def api_docs_redirect():
+    """Redirect to comprehensive Swagger UI documentation."""
+    from flask import redirect
+    return redirect('/api/v1/docs/', code=302)
+
+# API documentation information endpoint (JSON)
+@app.route('/api/v1/docs/info', methods=['GET'])
+def api_docs_info():
+    """API documentation information endpoint."""
     return jsonify({
         'title': 'Micro-Agent Development Platform API',
         'version': '1.0.0',
-        'description': 'Enterprise AI Agent Platform REST API',
-        'endpoints': [
-            {
-                'path': '/api/v1/health',
-                'method': 'GET',
-                'description': 'Health check endpoint',
-                'authentication': False
-            },
-            {
-                'path': '/api/v1/status',
-                'method': 'GET', 
-                'description': 'Detailed system status',
-                'authentication': True
-            },
-            {
-                'path': '/api/v1/business-rule-extraction',
-                'method': 'POST',
-                'description': 'Extract business rules from legacy code',
-                'authentication': True
-            },
-            {
-                'path': '/api/v1/application-triage',
-                'method': 'POST',
-                'description': 'Intelligent document routing and categorization',
-                'authentication': True
-            },
-            {
-                'path': '/api/v1/personal-data-protection',
-                'method': 'POST',
-                'description': 'GDPR/CCPA compliant PII protection',
-                'authentication': True
-            },
-            {
-                'path': '/api/v1/rule-documentation',
-                'method': 'POST',
-                'description': 'Generate business rule documentation',
-                'authentication': True
-            },
-            {
-                'path': '/api/v1/compliance-monitoring',
-                'method': 'POST',
-                'description': 'Audit trail and compliance management',
-                'authentication': True
-            },
-            {
-                'path': '/api/v1/advanced-documentation',
-                'method': 'POST',
-                'description': 'Enhanced documentation with tool integration',
-                'authentication': True
-            },
-            {
-                'path': '/api/v1/enterprise-data-privacy',
-                'method': 'POST',
-                'description': 'High-performance PII protection for large documents',
-                'authentication': True
-            }
-        ],
+        'description': 'Enterprise AI Agent Platform REST API with comprehensive Swagger documentation',
+        'documentation_url': '/api/v1/docs/',
+        'interactive_docs': 'Available at /api/v1/docs/ for testing and exploration',
+        'endpoints_count': 9,
         'authentication': {
             'type': 'API Key',
             'header': 'X-API-Key or Authorization: Bearer <token>',
             'description': 'Set API_KEY environment variable to enable authentication'
+        },
+        'features': [
+            'Interactive API testing with Swagger UI',
+            'Comprehensive request/response examples',
+            'Authentication flow documentation',
+            'Error handling and status code documentation',
+            'Multi-format response examples (JSON, Markdown, HTML)',
+            'Business context and use case descriptions'
+        ],
+        'agent_endpoints': {
+            'business_rule_extraction': {
+                'path': '/api/v1/business-rule-extraction',
+                'description': 'Extract business rules from legacy code systems',
+                'use_cases': ['Legacy system modernization', 'Code documentation', 'Business rule preservation']
+            },
+            'personal_data_protection': {
+                'path': '/api/v1/personal-data-protection', 
+                'description': 'GDPR/CCPA compliant PII detection and masking',
+                'use_cases': ['Data privacy compliance', 'PII anonymization', 'Regulatory reporting']
+            },
+            'application_triage': {
+                'path': '/api/v1/application-triage',
+                'description': 'Intelligent document routing and categorization',
+                'use_cases': ['Document processing automation', 'Content classification', 'Workflow routing']
+            },
+            'rule_documentation': {
+                'path': '/api/v1/rule-documentation',
+                'description': 'Generate comprehensive business rule documentation',
+                'use_cases': ['Business process documentation', 'Compliance documentation', 'Knowledge management']
+            },
+            'compliance_monitoring': {
+                'path': '/api/v1/compliance-monitoring',
+                'description': 'Audit trail and regulatory compliance management',
+                'use_cases': ['Audit trail generation', 'Compliance reporting', 'Risk management']
+            },
+            'advanced_documentation': {
+                'path': '/api/v1/advanced-documentation',
+                'description': 'Enhanced documentation with tool integration',
+                'use_cases': ['Technical documentation', 'API documentation', 'System integration docs']
+            },
+            'enterprise_data_privacy': {
+                'path': '/api/v1/enterprise-data-privacy',
+                'description': 'High-performance PII protection for large datasets',
+                'use_cases': ['Bulk data processing', 'Data migration privacy', 'Large-scale anonymization']
+            }
         }
     })
 

@@ -56,3 +56,6 @@ CLAUDE.md
 
 # Experimental/Development agents
 Agents/temp.py
+
+# Claude Code custom commands (development tools)
+.claude/commands/
