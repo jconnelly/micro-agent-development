@@ -18,7 +18,7 @@ from typing import Dict, Any, List, Optional, Callable
 from pathlib import Path
 
 from .RuleDocumentationGeneratorAgent import RuleDocumentationGeneratorAgent
-from .ComplianceMonitoringAgent import AuditLevel
+from .ComplianceMonitoringAgent import ComplianceMonitoringAgent, AuditLevel
 
 # Import Utils - handle both relative and absolute imports
 try:

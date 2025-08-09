@@ -25,6 +25,10 @@ class BusinessRuleExtractionAgent(BaseAgent):
     Automatically discovers and translates hidden business rules from legacy code into 
     clear, actionable business documentation. Critical for digital transformation, 
     regulatory compliance, and business process optimization initiatives.
+    The process works by taking a legacy code base (one file at a time) and walks through the file
+    line by line to pull out business logic from the functional(non-business) logic and formats the business rules
+    into a .json output file.  This output file can then be feed to the RuleDocumentationGeneratorAgent which will
+    output the rules into a business and user friendly Markdown or HTML file.
     
     **Key Business Benefits:**
     - **Digital Transformation**: Accelerate legacy modernization by 60-80%
@@ -42,6 +46,10 @@ class BusinessRuleExtractionAgent(BaseAgent):
     - **Perl**: Data processing and legacy integration scripts
     - **FORTRAN**: Scientific and engineering calculations
     - **Natural**: ADABAS database applications
+
+    **Additional Legacy Technologies:**
+    - Most structured legacy file types should work.  Feel free to contact me at contact@jeremiahconnelly.dev for any questions 
+    or to verify if your specific file type will work with this Micro-Agent
     
     **Business Rule Categories:**
     - **Validation Rules**: Data quality and business constraints

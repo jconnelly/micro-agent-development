@@ -99,6 +99,7 @@ nav:
     - Testing: developer/testing.md
     - Performance: developer/performance.md
   - About:
+    - About: about/about.md
     - Changelog: about/changelog.md
     - License: about/license.md
 

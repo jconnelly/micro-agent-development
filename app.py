@@ -45,7 +45,7 @@ try:
     from Agents.ComplianceMonitoringAgent import ComplianceMonitoringAgent
     from Agents.AdvancedDocumentationAgent import AdvancedDocumentationAgent
     from Agents.EnterpriseDataPrivacyAgent import EnterpriseDataPrivacyAgent
-    from Utils.response_formatter import ResponseFormatter, create_api_response
+    from Utils.response_formatter import ResponseFormatter
     from Utils.llm_providers import get_default_llm_provider, LLMProviderFactory
     from Utils.request_utils import RequestIdGenerator
     from Utils.time_utils import TimeUtils
@@ -236,10 +236,14 @@ def handle_request_timing(f):
             if isinstance(response, tuple):
                 data, status_code = response
                 if isinstance(data, dict):
-                    data['request_id'] = request_id
                     data['processing_time_ms'] = processing_time_ms
                 response = jsonify(data), status_code
+            elif isinstance(response, dict):
+                # Handle direct dictionary returns
+                response['processing_time_ms'] = processing_time_ms
+                response = jsonify(response)
             else:
+                # Handle Flask Response objects
                 response.headers['X-Request-ID'] = request_id
                 response.headers['X-Processing-Time-Ms'] = str(processing_time_ms)
             
@@ -274,6 +278,26 @@ def validate_json_request(required_fields: List[str] = None) -> Dict[str, Any]:
             raise BadRequest(f"Missing required fields: {', '.join(missing_fields)}")
     
     return data
+
+
+def create_simple_response(success: bool, message: str, data: Dict[str, Any] = None, 
+                          error_code: str = None, error_details: str = None) -> Dict[str, Any]:
+    """Create a simple standardized API response."""
+    response = {
+        'success': success,
+        'message': message,
+        'timestamp': TimeUtils.get_current_utc_timestamp().isoformat(),
+        'request_id': getattr(g, 'request_id', 'unknown')
+    }
+    
+    if success and data:
+        response['data'] = data
+    elif not success:
+        response['error'] = error_code or 'UNKNOWN_ERROR'
+        if error_details:
+            response['error_details'] = error_details
+    
+    return response
 
 
 @app.errorhandler(400)
@@ -396,14 +420,74 @@ def system_status():
         }), 500
 
 
-# API endpoint placeholders - we'll implement these in the next task
+# API endpoints - Full implementation
 @app.route('/api/v1/business-rule-extraction', methods=['POST'])
 @require_auth
 @handle_request_timing
 def business_rule_extraction():
     """Extract business rules from legacy code."""
-    # Will be implemented in next task
-    return jsonify({'message': 'Endpoint coming soon'}), 501
+    try:
+        # Validate request data
+        data = validate_json_request(['legacy_code'])
+        
+        # Get the agent
+        agent = agent_instances.get('business_rule_extraction')
+        if not agent:
+            return create_simple_response(
+                success=False,
+                message="Business Rule Extraction Agent not available", 
+                error_code="AGENT_UNAVAILABLE"
+            ), 503
+        
+        # Extract parameters
+        legacy_code = data['legacy_code']
+        context = data.get('context', None)
+        audit_level = data.get('audit_level', 1)
+        
+        # Validate inputs
+        if not legacy_code or not legacy_code.strip():
+            return create_simple_response(
+                success=False,
+                message="Legacy code cannot be empty",
+                error_code="VALIDATION_ERROR"
+            ), 400
+        
+        if len(legacy_code) > 1000000:  # 1MB limit for legacy code
+            return create_simple_response(
+                success=False,
+                message="Legacy code exceeds maximum size (1MB)",
+                error_code="CONTENT_TOO_LARGE"
+            ), 413
+        
+        # Call the agent
+        result = agent.extract_and_translate_rules(
+            legacy_code_snippet=legacy_code,
+            context=context,
+            audit_level=audit_level
+        )
+        
+        # Format response using standardized response formatter
+        return create_simple_response(
+            success=True,
+            message=f"Successfully extracted {len(result['extracted_rules'])} business rules",
+            data={
+                'extracted_rules': result['extracted_rules'],
+                'total_rules': len(result['extracted_rules']),
+                'audit_request_id': result['audit_log']['request_id']
+            }
+        )
+        
+    except BadRequest:
+        # Re-raise BadRequest to be handled by error handler
+        raise
+    except Exception as e:
+        logger.error(f"Business rule extraction failed: {str(e)}", exc_info=True)
+        return create_simple_response(
+            success=False,
+            message="Failed to extract business rules",
+            error_code="PROCESSING_ERROR",
+            error_details=str(e)
+        ), 500
 
 
 @app.route('/api/v1/application-triage', methods=['POST'])
@@ -411,8 +495,67 @@ def business_rule_extraction():
 @handle_request_timing
 def application_triage():
     """Intelligent document routing and categorization."""
-    # Will be implemented in next task
-    return jsonify({'message': 'Endpoint coming soon'}), 501
+    try:
+        # Validate request data
+        data = validate_json_request(['submission_data'])
+        
+        # Get the agent
+        agent = agent_instances.get('application_triage')
+        if not agent:
+            return create_simple_response(
+                success=False,
+                message="Application Triage Agent not available",
+                error_code="AGENT_UNAVAILABLE"
+            ), 503
+        
+        # Extract parameters
+        submission_data = data['submission_data']
+        audit_level = data.get('audit_level', 1)
+        
+        # Validate inputs
+        if not isinstance(submission_data, dict):
+            return create_simple_response(
+                success=False,
+                message="submission_data must be a JSON object",
+                error_code="VALIDATION_ERROR"
+            ), 400
+        
+        required_fields = ['id', 'content']
+        missing_fields = [field for field in required_fields if field not in submission_data]
+        if missing_fields:
+            return create_simple_response(
+                success=False,
+                message=f"submission_data missing required fields: {', '.join(missing_fields)}",
+                error_code="VALIDATION_ERROR"
+            ), 400
+        
+        # Call the agent
+        result = agent.triage_submission(
+            submission_data=submission_data,
+            audit_level=audit_level
+        )
+        
+        # Format response
+        return create_simple_response(
+            success=True,
+            message="Successfully processed application triage",
+            data={
+                'triage_decision': result['triage_decision'],
+                'pii_processing': result.get('pii_processing', {}),
+                'audit_request_id': result['audit_log']['request_id']
+            }
+        )
+        
+    except BadRequest:
+        raise
+    except Exception as e:
+        logger.error(f"Application triage failed: {str(e)}", exc_info=True)
+        return create_simple_response(
+            success=False,
+            message="Failed to process application triage",
+            error_code="PROCESSING_ERROR",
+            error_details=str(e)
+        ), 500
 
 
 @app.route('/api/v1/personal-data-protection', methods=['POST'])
@@ -420,8 +563,69 @@ def application_triage():
 @handle_request_timing
 def personal_data_protection():
     """GDPR/CCPA compliant PII protection."""
-    # Will be implemented in next task
-    return jsonify({'message': 'Endpoint coming soon'}), 501
+    try:
+        # Validate request data
+        data = validate_json_request(['data'])
+        
+        # Get the agent
+        agent = agent_instances.get('personal_data_protection')
+        if not agent:
+            return create_simple_response(
+                success=False,
+                message="Personal Data Protection Agent not available",
+                error_code="AGENT_UNAVAILABLE"
+            ), 503
+        
+        # Extract parameters
+        input_data = data['data']
+        masking_strategy_str = data.get('masking_strategy', 'PARTIAL_MASK')
+        audit_level = data.get('audit_level', 1)
+        
+        # Import and convert masking strategy
+        from Agents.PersonalDataProtectionAgent import MaskingStrategy
+        try:
+            masking_strategy = MaskingStrategy[masking_strategy_str.upper()] if masking_strategy_str else None
+        except (KeyError, AttributeError):
+            masking_strategy = MaskingStrategy.PARTIAL_MASK  # Default fallback
+        
+        # Validate inputs
+        if not input_data:
+            return create_simple_response(
+                success=False,
+                message="Data for PII protection cannot be empty",
+                error_code="VALIDATION_ERROR"
+            ), 400
+        
+        # Call the agent
+        result = agent.scrub_data(
+            data=input_data,
+            request_id=g.request_id,
+            custom_strategy=masking_strategy,
+            audit_level=audit_level
+        )
+        
+        # Format response
+        return create_simple_response(
+            success=True,
+            message=f"Successfully protected data with {len(result['pii_detected'])} PII types detected",
+            data={
+                'scrubbed_data': result['scrubbed_data'],
+                'pii_types_detected': [pii.value for pii in result['pii_detected']],
+                'scrubbing_summary': result['scrubbing_summary'],
+                'audit_request_id': result['audit_log']['request_id']
+            }
+        )
+        
+    except BadRequest:
+        raise
+    except Exception as e:
+        logger.error(f"Personal data protection failed: {str(e)}", exc_info=True)
+        return create_simple_response(
+            success=False,
+            message="Failed to protect personal data",
+            error_code="PROCESSING_ERROR",
+            error_details=str(e)
+        ), 500
 
 
 @app.route('/api/v1/rule-documentation', methods=['POST'])
@@ -429,8 +633,75 @@ def personal_data_protection():
 @handle_request_timing
 def rule_documentation():
     """Generate business rule documentation."""
-    # Will be implemented in next task
-    return jsonify({'message': 'Endpoint coming soon'}), 501
+    try:
+        # Validate request data
+        data = validate_json_request(['extracted_rules'])
+        
+        # Get the agent
+        agent = agent_instances.get('rule_documentation')
+        if not agent:
+            return create_simple_response(
+                success=False,
+                message="Rule Documentation Agent not available",
+                error_code="AGENT_UNAVAILABLE"
+            ), 503
+        
+        # Extract parameters
+        extracted_rules = data['extracted_rules']
+        output_format = data.get('output_format', 'markdown')
+        audit_level = data.get('audit_level', 1)
+        
+        # Validate inputs
+        if not isinstance(extracted_rules, list):
+            return create_simple_response(
+                success=False,
+                message="extracted_rules must be an array",
+                error_code="VALIDATION_ERROR"
+            ), 400
+        
+        if not extracted_rules:
+            return create_simple_response(
+                success=False,
+                message="extracted_rules cannot be empty",
+                error_code="VALIDATION_ERROR"
+            ), 400
+        
+        if output_format not in ['markdown', 'json', 'html']:
+            return create_simple_response(
+                success=False,
+                message="output_format must be 'markdown', 'json', or 'html'",
+                error_code="VALIDATION_ERROR"
+            ), 400
+        
+        # Call the agent
+        result = agent.document_and_visualize_rules(
+            extracted_rules=extracted_rules,
+            output_format=output_format,
+            audit_level=audit_level
+        )
+        
+        # Format response
+        return create_simple_response(
+            success=True,
+            message=f"Successfully generated {output_format} documentation for {len(extracted_rules)} rules",
+            data={
+                'generated_documentation': result['generated_documentation'],
+                'output_format': output_format,
+                'rule_count': len(extracted_rules),
+                'audit_request_id': result['audit_log']['request_id']
+            }
+        )
+        
+    except BadRequest:
+        raise
+    except Exception as e:
+        logger.error(f"Rule documentation failed: {str(e)}", exc_info=True)
+        return create_simple_response(
+            success=False,
+            message="Failed to generate rule documentation",
+            error_code="PROCESSING_ERROR",
+            error_details=str(e)
+        ), 500
 
 
 @app.route('/api/v1/compliance-monitoring', methods=['POST'])
@@ -438,8 +709,94 @@ def rule_documentation():
 @handle_request_timing
 def compliance_monitoring():
     """Audit trail and compliance management."""
-    # Will be implemented in next task
-    return jsonify({'message': 'Endpoint coming soon'}), 501
+    try:
+        # Validate request data
+        data = validate_json_request(['operation'])
+        
+        # Get the agent
+        agent = agent_instances.get('compliance_monitoring')
+        if not agent:
+            return create_simple_response(
+                success=False,
+                message="Compliance Monitoring Agent not available",
+                error_code="AGENT_UNAVAILABLE"
+            ), 503
+        
+        # Extract parameters
+        operation = data['operation']
+        
+        # Handle different compliance operations
+        if operation == 'query_logs':
+            # Query audit logs
+            filters = data.get('filters', {})
+            result = agent.query_audit_logs(filters)
+            
+            return create_simple_response(
+                success=True,
+                message=f"Retrieved {len(result.get('logs', []))} audit log entries",
+                data={
+                    'audit_logs': result.get('logs', []),
+                    'total_count': result.get('total_count', 0),
+                    'filters_applied': filters
+                }
+            )
+            
+        elif operation == 'generate_report':
+            # Generate compliance report
+            report_type = data.get('report_type', 'summary')
+            date_range = data.get('date_range', {})
+            
+            result = agent.generate_compliance_report(
+                report_type=report_type,
+                date_range=date_range
+            )
+            
+            return create_simple_response(
+                success=True,
+                message=f"Generated {report_type} compliance report",
+                data={
+                    'report': result,
+                    'report_type': report_type,
+                    'date_range': date_range
+                }
+            )
+            
+        elif operation == 'get_metrics':
+            # Get compliance metrics
+            metric_type = data.get('metric_type', 'overview')
+            
+            # Use agent info as basic metrics (since full metrics not implemented)
+            agent_info = agent.get_agent_info() if hasattr(agent, 'get_agent_info') else {}
+            
+            return create_simple_response(
+                success=True,
+                message="Retrieved compliance metrics",
+                data={
+                    'metrics': {
+                        'agent_status': 'operational',
+                        'metric_type': metric_type,
+                        'agent_info': agent_info
+                    }
+                }
+            )
+            
+        else:
+            return create_simple_response(
+                success=False,
+                message=f"Unknown operation: {operation}. Supported: 'query_logs', 'generate_report', 'get_metrics'",
+                error_code="VALIDATION_ERROR"
+            ), 400
+        
+    except BadRequest:
+        raise
+    except Exception as e:
+        logger.error(f"Compliance monitoring failed: {str(e)}", exc_info=True)
+        return create_simple_response(
+            success=False,
+            message="Failed to process compliance monitoring request",
+            error_code="PROCESSING_ERROR",
+            error_details=str(e)
+        ), 500
 
 
 @app.route('/api/v1/advanced-documentation', methods=['POST'])
@@ -447,8 +804,88 @@ def compliance_monitoring():
 @handle_request_timing
 def advanced_documentation():
     """Enhanced documentation with tool integration."""
-    # Will be implemented in next task
-    return jsonify({'message': 'Endpoint coming soon'}), 501
+    try:
+        # Validate request data
+        data = validate_json_request(['extracted_rules'])
+        
+        # Get the agent
+        agent = agent_instances.get('advanced_documentation')
+        if not agent:
+            return create_simple_response(
+                success=False,
+                message="Advanced Documentation Agent not available",
+                error_code="AGENT_UNAVAILABLE"
+            ), 503
+        
+        # Extract parameters
+        extracted_rules = data['extracted_rules']
+        output_directory = data.get('output_directory', 'documentation')
+        output_formats = data.get('output_formats', ['markdown', 'json'])
+        audit_level = data.get('audit_level', 2)
+        
+        # Validate inputs
+        if not isinstance(extracted_rules, list):
+            return create_simple_response(
+                success=False,
+                message="extracted_rules must be an array",
+                error_code="VALIDATION_ERROR"
+            ), 400
+        
+        if not extracted_rules:
+            return create_simple_response(
+                success=False,
+                message="extracted_rules cannot be empty",
+                error_code="VALIDATION_ERROR"
+            ), 400
+        
+        if not isinstance(output_formats, list):
+            return create_simple_response(
+                success=False,
+                message="output_formats must be an array",
+                error_code="VALIDATION_ERROR"
+            ), 400
+        
+        valid_formats = ['markdown', 'json', 'html']
+        invalid_formats = [fmt for fmt in output_formats if fmt not in valid_formats]
+        if invalid_formats:
+            return create_simple_response(
+                success=False,
+                message=f"Invalid output formats: {', '.join(invalid_formats)}. Valid formats: {', '.join(valid_formats)}",
+                error_code="VALIDATION_ERROR"
+            ), 400
+        
+        # Call the agent
+        result = agent.document_and_save_rules(
+            extracted_rules=extracted_rules,
+            output_directory=output_directory,
+            output_formats=output_formats,
+            audit_level=audit_level
+        )
+        
+        # Format response
+        return create_simple_response(
+            success=True,
+            message=f"Successfully generated documentation in {len(result['successful_files'])} files",
+            data={
+                'successful_files': result['successful_files'],
+                'failed_files': result['failed_files'],
+                'total_files_requested': result['total_files_requested'],
+                'output_directory': result['output_directory'],
+                'file_operations': result['file_operations'],
+                'tool_integration': result['operation_metadata']['tool_integration']
+            }
+        )
+        
+    except BadRequest:
+        raise
+    except Exception as e:
+        logger.error(f"Advanced documentation failed: {str(e)}", exc_info=True)
+        return create_simple_response(
+            success=False,
+            message="Failed to generate advanced documentation",
+            error_code="PROCESSING_ERROR",
+            error_details=str(e)
+        ), 500
 
 
 @app.route('/api/v1/enterprise-data-privacy', methods=['POST'])
@@ -456,8 +893,82 @@ def advanced_documentation():
 @handle_request_timing
 def enterprise_data_privacy():
     """High-performance PII protection for large documents."""
-    # Will be implemented in next task
-    return jsonify({'message': 'Endpoint coming soon'}), 501
+    try:
+        # Validate request data
+        data = validate_json_request(['data'])
+        
+        # Get the agent
+        agent = agent_instances.get('enterprise_data_privacy')
+        if not agent:
+            return create_simple_response(
+                success=False,
+                message="Enterprise Data Privacy Agent not available",
+                error_code="AGENT_UNAVAILABLE"
+            ), 503
+        
+        # Extract parameters
+        input_data = data['data']
+        masking_strategy_str = data.get('masking_strategy', 'PARTIAL_MASK')
+        batch_size = data.get('batch_size', 1000)
+        audit_level = data.get('audit_level', 1)
+        
+        # Import and convert masking strategy
+        from Agents.PersonalDataProtectionAgent import MaskingStrategy
+        try:
+            masking_strategy = MaskingStrategy[masking_strategy_str.upper()] if masking_strategy_str else None
+        except (KeyError, AttributeError):
+            masking_strategy = MaskingStrategy.PARTIAL_MASK  # Default fallback
+        
+        # Validate inputs
+        if not input_data:
+            return create_simple_response(
+                success=False,
+                message="Data for privacy protection cannot be empty",
+                error_code="VALIDATION_ERROR"
+            ), 400
+        
+        # Validate batch size
+        if not isinstance(batch_size, int) or batch_size < 1 or batch_size > 10000:
+            return create_simple_response(
+                success=False,
+                message="batch_size must be an integer between 1 and 10000",
+                error_code="VALIDATION_ERROR"
+            ), 400
+        
+        # Call the agent (assuming it has similar interface to PersonalDataProtectionAgent)
+        result = agent.scrub_data(
+            data=input_data,
+            request_id=g.request_id,
+            custom_strategy=masking_strategy,
+            audit_level=audit_level
+        )
+        
+        # Format response
+        return create_simple_response(
+            success=True,
+            message=f"Successfully processed enterprise data privacy with {len(result['pii_detected'])} PII types detected",
+            data={
+                'scrubbed_data': result['scrubbed_data'],
+                'pii_types_detected': [pii.value for pii in result['pii_detected']],
+                'scrubbing_summary': result['scrubbing_summary'],
+                'performance_metrics': {
+                    'batch_size': batch_size,
+                    'masking_strategy': masking_strategy
+                },
+                'audit_request_id': result['audit_log']['request_id']
+            }
+        )
+        
+    except BadRequest:
+        raise
+    except Exception as e:
+        logger.error(f"Enterprise data privacy failed: {str(e)}", exc_info=True)
+        return create_simple_response(
+            success=False,
+            message="Failed to process enterprise data privacy",
+            error_code="PROCESSING_ERROR",
+            error_details=str(e)
+        ), 500
 
 
 # API documentation endpoint

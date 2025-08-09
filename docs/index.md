@@ -284,6 +284,12 @@ results = extractor.extract_and_translate_rules(
 - **[Enterprise Integration](examples/enterprise-integration.md)** - Production deployment
 - **[Batch Processing](examples/batch-processing.md)** - High-volume processing
 
+### Developer Guide
+- **[Basic Usage](examples/basic-usage.md)** - Simple integration examples
+
+### About
+- **[About](about/about.md)** - About this marketplace
+
 ---
 
 ## 🤝 Community & Support
@@ -360,4 +366,4 @@ Choose your path based on your role:
 
 ---
 
-*Built with ❤️ for enterprise AI automation. Powered by advanced language models and production-ready architecture.*
+*Built for enterprise AI automation. Powered by advanced language models and production-ready architecture.*
