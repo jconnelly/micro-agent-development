@@ -20,10 +20,10 @@ def test_auditing_agent_performance():
     """Test AuditingAgent set optimization performance"""
     print("[TEST] Testing AuditingAgent Set Optimization...")
     
-    from Agents.AuditingAgent import AgentAuditing, AuditLevel
+    from Agents.ComplianceMonitoringAgent import ComplianceMonitoringAgent, AuditLevel
     
     # Create test agent
-    auditing_agent = AgentAuditing("test_list_to_set_audit.jsonl")
+    auditing_agent = ComplianceMonitoringAgent("test_list_to_set_audit.jsonl")
     
     # Create test data with fields that will trigger the optimized code paths
     test_log_data = {
@@ -91,12 +91,12 @@ def test_pii_agent_performance():
     """Test PIIScrubbingAgent set optimization performance"""
     print("[TEST] Testing PIIScrubbingAgent Set Optimization...")
     
-    from Agents.AuditingAgent import AgentAuditing
-    from Agents.PIIScrubbingAgent import PIIScrubbingAgent, PIIContext, PIIType
+    from Agents.ComplianceMonitoringAgent import ComplianceMonitoringAgent
+    from Agents.PersonalDataProtectionAgent import PersonalDataProtectionAgent, PIIContext, PIIType
     
     # Create test agent
-    audit_system = AgentAuditing("test_pii_set_optimization.jsonl")
-    pii_agent = PIIScrubbingAgent(
+    audit_system = ComplianceMonitoringAgent("test_pii_set_optimization.jsonl")
+    pii_agent = PersonalDataProtectionAgent(
         audit_system=audit_system,
         context=PIIContext.FINANCIAL,  # Has priority types that will trigger set optimization
         log_level=0  # Silent for performance test
@@ -150,12 +150,12 @@ def test_rule_documentation_agent_performance():
     """Test RuleDocumentationAgent set optimization performance"""
     print("[TEST] Testing RuleDocumentationAgent Set Optimization...")
     
-    from Agents.AuditingAgent import AgentAuditing
-    from Agents.RuleDocumentationAgent import RuleDocumentationAgent
+    from Agents.ComplianceMonitoringAgent import ComplianceMonitoringAgent
+    from Agents.RuleDocumentationGeneratorAgent import RuleDocumentationGeneratorAgent
     
     # Create test agent
-    audit_system = AgentAuditing("test_rule_doc_set_optimization.jsonl")
-    doc_agent = RuleDocumentationAgent(
+    audit_system = ComplianceMonitoringAgent("test_rule_doc_set_optimization.jsonl")
+    doc_agent = RuleDocumentationGeneratorAgent(
         llm_client=None,
         audit_system=audit_system,
         log_level=0  # Silent for performance test

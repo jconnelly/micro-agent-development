@@ -12,8 +12,8 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 # Import the classes from their respective files
-from Agents.AuditingAgent import AgentAuditing, AuditLevel
-from Agents.LegacyRuleExtractionAndTranslatorAgent import LegacyRuleExtractionAgent
+from Agents.ComplianceMonitoringAgent import ComplianceMonitoringAgent, AuditLevel
+from Agents.BusinessRuleExtractionAgent import BusinessRuleExtractorAgent
 
 # Import the Google Generative AI library
 import google.generativeai as genai
@@ -50,7 +50,7 @@ def main():
         return
 
     # --- Step 2: Initialize AgentAuditing ---
-    audit_system = AgentAuditing(log_storage_path=audit_log_file_path)
+    audit_system = ComplianceMonitoringAgent(log_storage_path=audit_log_file_path)
     print(f"AgentAuditing initialized. Logs will be written to {audit_log_file_path} (if audit_level > 0).")
 
     # --- Step 3: Configure Gemini API ---
@@ -68,7 +68,7 @@ def main():
         return
 
     # --- Step 4: Initialize LegacyRuleExtractionAgent ---
-    rule_extractor_agent = LegacyRuleExtractionAgent(
+    rule_extractor_agent = BusinessRuleExtractorAgent(
         llm_client=real_llm_client, # Pass the real client
         audit_system=audit_system,
         log_level=1,  # Enable logging for development/testing

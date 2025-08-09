@@ -14,16 +14,16 @@ parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, parent_dir)
 
 try:
-    from Agents.IntelligentSubmissionTriageAgent import IntelligentSubmissionTriageAgent
-    from Agents.AuditingAgent import AgentAuditing
-    from Agents.PIIScrubbingAgent import MaskingStrategy
+    from Agents.ApplicationTriageAgent import IntelligentSubmissionTriageAgent
+    from Agents.ComplianceMonitoringAgent import ComplianceMonitoringAgent
+    from Agents.PersonalDataProtectionAgent import MaskingStrategy
     
     print("[PASS] BaseAgent Integration Test")
     print("=" * 50)
     
     # Test 1: Create audit system
     print("1. Creating audit system...")
-    audit_system = AgentAuditing("test_audit.jsonl")
+    audit_system = ComplianceMonitoringAgent("test_audit.jsonl")
     print("   [PASS] Audit system created")
     
     # Test 2: Create agent with BaseAgent inheritance

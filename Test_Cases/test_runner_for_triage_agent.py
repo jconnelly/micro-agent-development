@@ -6,8 +6,8 @@ import os
 import socket
 
 # Import the classes from their respective files
-from Agents.AuditingAgent import AgentAuditing, AuditLevel
-from Agents.IntelligentSubmissionTriageAgent import IntelligentSubmissionTriageAgent
+from Agents.ComplianceMonitoringAgent import ComplianceMonitoringAgent, AuditLevel
+from Agents.ApplicationTriageAgent import IntelligentSubmissionTriageAgent
 
 # Import the Google Generative AI library
 import google.generativeai as genai
@@ -62,7 +62,7 @@ def main():
     audit_log_file_path = f"./Rule_Agent_Output_Files/triage_{sector}_audit_logs.jsonl"
 
     # --- Step 2: Initialize AgentAuditing ---
-    audit_system = AgentAuditing(log_storage_path=audit_log_file_path)
+    audit_system = ComplianceMonitoringAgent(log_storage_path=audit_log_file_path)
     print(f"AgentAuditing initialized. Logs will be written to {audit_log_file_path} (if audit_level > 0).")
 
     # --- Step 3: Configure Gemini API ---

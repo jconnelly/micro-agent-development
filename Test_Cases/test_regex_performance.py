@@ -54,12 +54,12 @@ def test_pii_agent_functionality():
     """Test that PIIScrubbingAgent functionality is preserved after optimization"""
     print("[TEST] Testing PIIScrubbingAgent Functionality After Optimization...")
     
-    from Agents.AuditingAgent import AgentAuditing
-    from Agents.PIIScrubbingAgent import PIIScrubbingAgent, PIIContext, MaskingStrategy
+    from Agents.ComplianceMonitoringAgent import ComplianceMonitoringAgent
+    from Agents.PersonalDataProtectionAgent import PersonalDataProtectionAgent, PIIContext, MaskingStrategy
     
     # Create test agent
-    audit_system = AgentAuditing("test_regex_performance.jsonl")
-    pii_agent = PIIScrubbingAgent(
+    audit_system = ComplianceMonitoringAgent("test_regex_performance.jsonl")
+    pii_agent = PersonalDataProtectionAgent(
         audit_system=audit_system,
         context=PIIContext.GENERAL,
         log_level=1  # Enable logging to see compilation message
@@ -148,12 +148,12 @@ def test_pattern_compilation_statistics():
     """Test and report pattern compilation statistics"""
     print("[TEST] Testing Pattern Compilation Statistics...")
     
-    from Agents.AuditingAgent import AgentAuditing
-    from Agents.PIIScrubbingAgent import PIIScrubbingAgent, PIIContext, PIIType
+    from Agents.ComplianceMonitoringAgent import ComplianceMonitoringAgent
+    from Agents.PersonalDataProtectionAgent import PersonalDataProtectionAgent, PIIContext, PIIType
     
     # Create test agent to check compilation
-    audit_system = AgentAuditing("test_pattern_stats.jsonl")
-    pii_agent = PIIScrubbingAgent(
+    audit_system = ComplianceMonitoringAgent("test_pattern_stats.jsonl")
+    pii_agent = PersonalDataProtectionAgent(
         audit_system=audit_system,
         context=PIIContext.GENERAL,
         log_level=0  # Silent for stats test

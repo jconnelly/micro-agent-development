@@ -5,14 +5,14 @@ Test runner for the updated IntelligentSubmissionTriageAgent.
 Demonstrates all the new production-ready features.
 """
 
-from Agents.IntelligentSubmissionTriageAgent import IntelligentSubmissionTriageAgent
-from Agents.AuditingAgent import AgentAuditing, AuditLevel
+from Agents.ApplicationTriageAgent import IntelligentSubmissionTriageAgent
+from Agents.ComplianceMonitoringAgent import ComplianceMonitoringAgent, AuditLevel
 
 def main():
     print("=== IntelligentSubmissionTriageAgent Production Test ===")
     
     # Initialize audit system
-    audit_system = AgentAuditing("./Rule_Agent_Output_Files/triage_production_audit.jsonl")
+    audit_system = ComplianceMonitoringAgent("./Rule_Agent_Output_Files/triage_production_audit.jsonl")
     
     # Test different configurations
     print("\n1. Testing Production Mode (Silent Logging):")

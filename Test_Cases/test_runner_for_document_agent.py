@@ -10,9 +10,9 @@ parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, parent_dir)
 
 # Import the classes from their respective files
-from Agents.AuditingAgent import AgentAuditing, AuditLevel
-from Agents.RuleDocumentationAgent import RuleDocumentationAgent
-from Agents.LegacyRuleExtractionAndTranslatorAgent import LegacyRuleExtractionAgent
+from Agents.ComplianceMonitoringAgent import ComplianceMonitoringAgent, AuditLevel
+from Agents.RuleDocumentationGeneratorAgent import RuleDocumentationGeneratorAgent
+from Agents.BusinessRuleExtractionAgent import BusinessRuleExtractorAgent
 
 # Import the Google Generative AI library
 import google.generativeai as genai
@@ -47,7 +47,7 @@ def test_documentation_formats(rules_json_file: str, output_format: str = "markd
 
     # Initialize AgentAuditing
     audit_log_file_path = f"./Rule_Agent_Output_Files/doc_test_{output_format}_audit.jsonl"
-    audit_system = AgentAuditing(log_storage_path=audit_log_file_path)
+    audit_system = ComplianceMonitoringAgent(log_storage_path=audit_log_file_path)
     print(f"AgentAuditing initialized for {output_format} format test.")
 
     # Configure Gemini API (though we won't use LLM for this test)
@@ -62,7 +62,7 @@ def test_documentation_formats(rules_json_file: str, output_format: str = "markd
         real_llm_client = None
 
     # Initialize RuleDocumentationAgent
-    doc_agent = RuleDocumentationAgent(real_llm_client, audit_system)
+    doc_agent = RuleDocumentationGeneratorAgent(real_llm_client, audit_system)
 
     # Generate documentation in specified format
     print(f"\nGenerating {output_format} documentation...")
@@ -163,7 +163,7 @@ def main():
         return
 
     # --- Step 2: Initialize AgentAuditing ---
-    audit_system = AgentAuditing(log_storage_path=audit_log_file_path)
+    audit_system = ComplianceMonitoringAgent(log_storage_path=audit_log_file_path)
     print(f"AgentAuditing initialized. Logs will be written to {audit_log_file_path} (if audit_level > 0).")
 
     # --- Step 3: Load environment variables and configure Gemini API ---
@@ -181,7 +181,7 @@ def main():
         return
 
     # --- Step 4: Initialize LegacyRuleExtractionAgent ---
-    rule_extractor_agent = LegacyRuleExtractionAgent(
+    rule_extractor_agent = BusinessRuleExtractorAgent(
         llm_client=real_llm_client, # Pass the real client
         audit_system=audit_system
     )
@@ -199,7 +199,7 @@ def main():
     audit_log_entry = extraction_result.get("audit_log", {})
 
     # Initialize with LLM client and audit system
-    doc_agent = RuleDocumentationAgent(real_llm_client, audit_system)
+    doc_agent = RuleDocumentationGeneratorAgent(real_llm_client, audit_system)
 
     # Generate documentation from extracted rules
     result = doc_agent.document_and_visualize_rules(

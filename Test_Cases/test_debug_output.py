@@ -6,8 +6,8 @@ This will help us isolate the issue from API quota problems.
 """
 
 import json
-from Agents.AuditingAgent import AgentAuditing, AuditLevel
-from Agents.LegacyRuleExtractionAndTranslatorAgent import LegacyRuleExtractionAgent
+from Agents.ComplianceMonitoringAgent import ComplianceMonitoringAgent, AuditLevel
+from Agents.BusinessRuleExtractionAgent import BusinessRuleExtractorAgent
 
 # Mock LLM client that returns predictable results
 class MockLLMClient:
@@ -51,10 +51,10 @@ def main():
         return
 
     # Initialize components
-    audit_system = AgentAuditing("./Rule_Agent_Output_Files/debug_audit_logs.jsonl")
+    audit_system = ComplianceMonitoringAgent("./Rule_Agent_Output_Files/debug_audit_logs.jsonl")
     mock_llm_client = MockLLMClient()
     
-    rule_extractor_agent = LegacyRuleExtractionAgent(
+    rule_extractor_agent = BusinessRuleExtractorAgent(
         llm_client=mock_llm_client,
         audit_system=audit_system,
         log_level=1,  # Enable logging

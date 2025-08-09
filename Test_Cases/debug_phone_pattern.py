@@ -14,12 +14,12 @@ sys.path.insert(0, parent_dir)
 
 def test_phone_patterns():
     """Test phone pattern detection"""
-    from Agents.AuditingAgent import AgentAuditing  
-    from Agents.PIIScrubbingAgent import PIIScrubbingAgent, PIIContext, PIIType
+    from Agents.ComplianceMonitoringAgent import ComplianceMonitoringAgent  
+    from Agents.PersonalDataProtectionAgent import PersonalDataProtectionAgent, PIIContext, PIIType
     
     # Create test agent
-    audit_system = AgentAuditing("debug_phone.jsonl")
-    pii_agent = PIIScrubbingAgent(
+    audit_system = ComplianceMonitoringAgent("debug_phone.jsonl")
+    pii_agent = PersonalDataProtectionAgent(
         audit_system=audit_system,
         context=PIIContext.GENERAL,
         log_level=1

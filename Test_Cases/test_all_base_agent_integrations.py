@@ -20,11 +20,11 @@ def test_agent_creation_and_inheritance():
     print("=" * 60)
     
     try:
-        from Agents.AuditingAgent import AgentAuditing
+        from Agents.ComplianceMonitoringAgent import ComplianceMonitoringAgent
         
         # Create audit system for all agents
         print("1. Creating shared audit system...")
-        audit_system = AgentAuditing("test_comprehensive_audit.jsonl")
+        audit_system = ComplianceMonitoringAgent("test_comprehensive_audit.jsonl")
         print("   [PASS] Shared audit system created")
         
         results = {}
@@ -32,7 +32,7 @@ def test_agent_creation_and_inheritance():
         # Test IntelligentSubmissionTriageAgent
         print("2. Testing IntelligentSubmissionTriageAgent...")
         try:
-            from Agents.IntelligentSubmissionTriageAgent import IntelligentSubmissionTriageAgent
+            from Agents.ApplicationTriageAgent import IntelligentSubmissionTriageAgent
             triage_agent = IntelligentSubmissionTriageAgent(
                 llm_client=None,
                 audit_system=audit_system,
@@ -63,8 +63,8 @@ def test_agent_creation_and_inheritance():
         # Test LegacyRuleExtractionAgent  
         print("3. Testing LegacyRuleExtractionAgent...")
         try:
-            from Agents.LegacyRuleExtractionAndTranslatorAgent import LegacyRuleExtractionAgent
-            extraction_agent = LegacyRuleExtractionAgent(
+            from Agents.BusinessRuleExtractionAgent import BusinessRuleExtractorAgent
+            extraction_agent = BusinessRuleExtractorAgent(
                 llm_client=None,
                 audit_system=audit_system,
                 agent_id="test-extraction-001",
@@ -95,8 +95,8 @@ def test_agent_creation_and_inheritance():
         # Test PIIScrubbingAgent
         print("4. Testing PIIScrubbingAgent...")
         try:
-            from Agents.PIIScrubbingAgent import PIIScrubbingAgent, PIIContext
-            pii_agent = PIIScrubbingAgent(
+            from Agents.PersonalDataProtectionAgent import PersonalDataProtectionAgent, PIIContext
+            pii_agent = PersonalDataProtectionAgent(
                 audit_system=audit_system,
                 context=PIIContext.GENERAL,
                 agent_id="test-pii-001",
@@ -125,8 +125,8 @@ def test_agent_creation_and_inheritance():
         # Test RuleDocumentationAgent
         print("5. Testing RuleDocumentationAgent...")
         try:
-            from Agents.RuleDocumentationAgent import RuleDocumentationAgent
-            doc_agent = RuleDocumentationAgent(
+            from Agents.RuleDocumentationGeneratorAgent import RuleDocumentationGeneratorAgent
+            doc_agent = RuleDocumentationGeneratorAgent(
                 llm_client=None,
                 audit_system=audit_system,
                 agent_id="test-doc-001",
@@ -168,15 +168,15 @@ def test_common_functionality():
     print("=" * 60)
     
     try:
-        from Agents.AuditingAgent import AgentAuditing
-        from Agents.IntelligentSubmissionTriageAgent import IntelligentSubmissionTriageAgent
-        from Agents.LegacyRuleExtractionAndTranslatorAgent import LegacyRuleExtractionAgent
+        from Agents.ComplianceMonitoringAgent import ComplianceMonitoringAgent
+        from Agents.ApplicationTriageAgent import IntelligentSubmissionTriageAgent
+        from Agents.BusinessRuleExtractionAgent import BusinessRuleExtractorAgent
         
-        audit_system = AgentAuditing("test_common_functionality.jsonl")
+        audit_system = ComplianceMonitoringAgent("test_common_functionality.jsonl")
         
         # Create two different agents
         agent1 = IntelligentSubmissionTriageAgent(None, audit_system, "test-1", 1)
-        agent2 = LegacyRuleExtractionAgent(None, audit_system, "test-2", 1)
+        agent2 = BusinessRuleExtractorAgent(None, audit_system, "test-2", 1)
         
         print("1. Testing IP address consistency...")
         ip1 = agent1.get_ip_address()

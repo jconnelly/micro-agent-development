@@ -11,9 +11,9 @@ from typing import Dict, Any
 from dotenv import load_dotenv
 import google.generativeai as genai
 
-from Agents.PIIScrubbingAgent import PIIScrubbingAgent, PIIType, MaskingStrategy, PIIContext
-from Agents.IntelligentSubmissionTriageAgent import IntelligentSubmissionTriageAgent
-from Agents.AuditingAgent import AgentAuditing, AuditLevel
+from Agents.PersonalDataProtectionAgent import PersonalDataProtectionAgent, PIIType, MaskingStrategy, PIIContext
+from Agents.ApplicationTriageAgent import IntelligentSubmissionTriageAgent
+from Agents.ComplianceMonitoringAgent import ComplianceMonitoringAgent, AuditLevel
 
 
 def test_standalone_pii_scrubbing():
@@ -21,7 +21,7 @@ def test_standalone_pii_scrubbing():
     print("=== Standalone PII Scrubbing Tests ===")
     
     # Initialize audit system
-    audit_system = AgentAuditing("./Rule_Agent_Output_Files/pii_test_audit.jsonl")
+    audit_system = ComplianceMonitoringAgent("./Rule_Agent_Output_Files/pii_test_audit.jsonl")
     
     # Test data with various PII types
     test_data_samples = [
@@ -66,7 +66,7 @@ def test_standalone_pii_scrubbing():
         print(f"\n--- Testing {config['description']} ---")
         
         # Initialize PII scrubber with current config
-        pii_scrubber = PIIScrubbingAgent(
+        pii_scrubber = PersonalDataProtectionAgent(
             audit_system=audit_system,
             context=config['context'],
             log_level=1,  # Verbose for testing
@@ -113,7 +113,7 @@ def test_pii_integrated_triage():
     print("\n=== Integrated PII + Triage Agent Tests ===")
     
     # Initialize audit system
-    audit_system = AgentAuditing("./Rule_Agent_Output_Files/pii_triage_integrated_audit.jsonl")
+    audit_system = ComplianceMonitoringAgent("./Rule_Agent_Output_Files/pii_triage_integrated_audit.jsonl")
     
     # Configure Gemini API
     try:
@@ -252,7 +252,7 @@ def test_pii_compliance_scenarios():
     """Test PII scrubbing for compliance scenarios"""
     print("\n=== PII Compliance Scenario Tests ===")
     
-    audit_system = AgentAuditing("./Rule_Agent_Output_Files/pii_compliance_audit.jsonl")
+    audit_system = ComplianceMonitoringAgent("./Rule_Agent_Output_Files/pii_compliance_audit.jsonl")
     
     # Compliance test scenarios
     compliance_scenarios = [
@@ -291,7 +291,7 @@ def test_pii_compliance_scenarios():
     for scenario in compliance_scenarios:
         print(f"\n--- {scenario['name']} ---")
         
-        pii_scrubber = PIIScrubbingAgent(
+        pii_scrubber = PersonalDataProtectionAgent(
             audit_system=audit_system,
             context=scenario['context'],
             log_level=1,

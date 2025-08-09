@@ -53,3 +53,6 @@ Sample_Data_Files/
 # Documentation (development notes)
 Code_Cleanup.md
 CLAUDE.md
+
+# Experimental/Development agents
+Agents/temp.py

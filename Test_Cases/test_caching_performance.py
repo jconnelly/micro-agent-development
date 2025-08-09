@@ -20,12 +20,12 @@ def test_pii_detection_caching():
     """Test PIIScrubbingAgent LRU caching performance for repeated text inputs"""
     print("[TEST] Testing PIIScrubbingAgent LRU Caching Performance...")
     
-    from Agents.AuditingAgent import AgentAuditing
-    from Agents.PIIScrubbingAgent import PIIScrubbingAgent, PIIContext
+    from Agents.ComplianceMonitoringAgent import ComplianceMonitoringAgent
+    from Agents.PersonalDataProtectionAgent import PersonalDataProtectionAgent, PIIContext
     
     # Create test agent
-    audit_system = AgentAuditing("test_pii_caching.jsonl")
-    pii_agent = PIIScrubbingAgent(
+    audit_system = ComplianceMonitoringAgent("test_pii_caching.jsonl")
+    pii_agent = PersonalDataProtectionAgent(
         audit_system=audit_system,
         context=PIIContext.FINANCIAL,
         log_level=0  # Silent for performance test
@@ -87,12 +87,12 @@ def test_file_context_caching():
     """Test LegacyRuleExtractionAgent file context extraction caching"""
     print("[TEST] Testing File Context Extraction LRU Caching Performance...")
     
-    from Agents.AuditingAgent import AgentAuditing
-    from Agents.LegacyRuleExtractionAndTranslatorAgent import LegacyRuleExtractionAgent
+    from Agents.ComplianceMonitoringAgent import ComplianceMonitoringAgent
+    from Agents.BusinessRuleExtractionAgent import BusinessRuleExtractorAgent
     
     # Create test agent
-    audit_system = AgentAuditing("test_file_context_caching.jsonl")
-    extraction_agent = LegacyRuleExtractionAgent(
+    audit_system = ComplianceMonitoringAgent("test_file_context_caching.jsonl")
+    extraction_agent = BusinessRuleExtractorAgent(
         llm_client=None,  # We're only testing file context extraction
         audit_system=audit_system,
         log_level=0
@@ -178,12 +178,12 @@ def test_ip_address_caching():
     """Test BaseAgent IP address caching (already implemented)"""
     print("[TEST] Testing BaseAgent IP Address Caching Performance...")
     
-    from Agents.AuditingAgent import AgentAuditing
-    from Agents.PIIScrubbingAgent import PIIScrubbingAgent, PIIContext
+    from Agents.ComplianceMonitoringAgent import ComplianceMonitoringAgent
+    from Agents.PersonalDataProtectionAgent import PersonalDataProtectionAgent, PIIContext
     
     # Create test agent (using concrete implementation)
-    audit_system = AgentAuditing("test_ip_caching.jsonl")
-    test_agent = PIIScrubbingAgent(
+    audit_system = ComplianceMonitoringAgent("test_ip_caching.jsonl")
+    test_agent = PersonalDataProtectionAgent(
         audit_system=audit_system,
         context=PIIContext.GENERAL,
         log_level=0

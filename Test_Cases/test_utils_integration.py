@@ -18,12 +18,12 @@ def test_baseagent_utils_integration():
     """Test BaseAgent integration with Utils"""
     print("[TEST] Testing BaseAgent Utils Integration...")
     
-    from Agents.AuditingAgent import AgentAuditing
-    from Agents.IntelligentSubmissionTriageAgent import IntelligentSubmissionTriageAgent
+    from Agents.ComplianceMonitoringAgent import ComplianceMonitoringAgent
+    from Agents.ApplicationTriageAgent import IntelligentSubmissionTriageAgent
     from Utils import RequestIdGenerator, TimeUtils
     
     # Create test agent
-    audit_system = AgentAuditing("test_utils_integration.jsonl")
+    audit_system = ComplianceMonitoringAgent("test_utils_integration.jsonl")
     agent = IntelligentSubmissionTriageAgent(
         llm_client=None,
         audit_system=audit_system,
@@ -59,13 +59,13 @@ def test_pii_agent_utils_integration():
     """Test PIIScrubbingAgent integration with Utils"""
     print("[TEST] Testing PIIScrubbingAgent Utils Integration...")
     
-    from Agents.AuditingAgent import AgentAuditing
-    from Agents.PIIScrubbingAgent import PIIScrubbingAgent, PIIContext
+    from Agents.ComplianceMonitoringAgent import ComplianceMonitoringAgent
+    from Agents.PersonalDataProtectionAgent import PersonalDataProtectionAgent, PIIContext
     from Utils import TextProcessingUtils, JsonUtils
     
     # Create test agent
-    audit_system = AgentAuditing("test_pii_utils_integration.jsonl")
-    pii_agent = PIIScrubbingAgent(
+    audit_system = ComplianceMonitoringAgent("test_pii_utils_integration.jsonl")
+    pii_agent = PersonalDataProtectionAgent(
         audit_system=audit_system,
         context=PIIContext.GENERAL
     )
@@ -98,7 +98,7 @@ def test_utils_import_consistency():
     
     # Import agents that use Utils
     from Agents.BaseAgent import BaseAgent
-    from Agents.PIIScrubbingAgent import PIIScrubbingAgent
+    from Agents.PersonalDataProtectionAgent import PersonalDataProtectionAgent
     
     # Test that the same Utils classes are available
     req_id1 = RequestIdGenerator.create_request_id("direct")

@@ -18,12 +18,12 @@ def test_clean_rule_ids():
     """Test that rule IDs are clean and don't contain chunk prefixes"""
     print("[TEST] Testing Clean Rule IDs (No Chunk Prefixes)...")
     
-    from Agents.AuditingAgent import AgentAuditing
-    from Agents.LegacyRuleExtractionAndTranslatorAgent import LegacyRuleExtractionAgent
+    from Agents.ComplianceMonitoringAgent import ComplianceMonitoringAgent
+    from Agents.BusinessRuleExtractionAgent import BusinessRuleExtractorAgent
     
     # Create test agent
-    audit_system = AgentAuditing("test_clean_rule_ids.jsonl")
-    extraction_agent = LegacyRuleExtractionAgent(
+    audit_system = ComplianceMonitoringAgent("test_clean_rule_ids.jsonl")
+    extraction_agent = BusinessRuleExtractorAgent(
         llm_client=None,  # We're testing deduplication logic, not LLM calls
         audit_system=audit_system,
         log_level=0
@@ -76,11 +76,11 @@ def test_empty_and_edge_cases():
     """Test edge cases for rule deduplication"""
     print("[TEST] Testing Edge Cases for Rule Deduplication...")
     
-    from Agents.AuditingAgent import AgentAuditing
-    from Agents.LegacyRuleExtractionAndTranslatorAgent import LegacyRuleExtractionAgent
+    from Agents.ComplianceMonitoringAgent import ComplianceMonitoringAgent
+    from Agents.BusinessRuleExtractionAgent import BusinessRuleExtractorAgent
     
-    audit_system = AgentAuditing("test_edge_cases.jsonl")
-    extraction_agent = LegacyRuleExtractionAgent(
+    audit_system = ComplianceMonitoringAgent("test_edge_cases.jsonl")
+    extraction_agent = BusinessRuleExtractorAgent(
         llm_client=None,
         audit_system=audit_system,
         log_level=0
