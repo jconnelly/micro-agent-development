@@ -260,35 +260,74 @@ class RuleDocumentationGeneratorAgent(BaseAgent):
             self.logger.warning(f"Failed to load domains configuration: {e}. Using fallback.")
             domain_keywords = fallback_domain_keywords['domains']
         
-        domain_scores = {domain: 0 for domain in domain_keywords.keys()}
-        total_text = ""
+        # Phase 11 Performance Optimization: Single-pass domain scoring algorithm
         
-        # Aggregate all text from rules for analysis
-        for rule in extracted_rules:
-            rule_text = ""
-            rule_text += str(rule.get('business_description', '')).lower() + " "
-            rule_text += str(rule.get('conditions', '')).lower() + " "
-            rule_text += str(rule.get('actions', '')).lower() + " "
-            
-            # Handle source_code_lines which might be a string or list
-            source_lines = rule.get('source_code_lines', '')
-            if isinstance(source_lines, list):
-                rule_text += " ".join(str(line) for line in source_lines).lower() + " "
-            else:
-                rule_text += str(source_lines).lower() + " "
-            
-            total_text += rule_text
-        
-        # Pre-convert text to lowercase once for performance (instead of multiple .lower() calls)
-        total_text_lower = total_text.lower()
-        
-        # Score each domain based on keyword frequency
+        # Pre-compile all keywords with their domain and weight for efficient processing
+        keyword_mapping = {}  # keyword -> [(domain, weight), ...]
         for domain, config in domain_keywords.items():
             for keyword in config['keywords']:
-                count = total_text_lower.count(keyword.lower())
-                domain_scores[domain] += count * config['weight']
+                keyword_lower = keyword.lower()
+                if keyword_lower not in keyword_mapping:
+                    keyword_mapping[keyword_lower] = []
+                keyword_mapping[keyword_lower].append((domain, config['weight'], keyword))
         
-        # Determine primary domain(s)
+        # Initialize scoring structures
+        domain_scores = {domain: 0 for domain in domain_keywords.keys()}
+        detected_keywords_set = set()
+        
+        # Single-pass text processing: aggregate text and score simultaneously
+        total_text_parts = []
+        
+        for rule in extracted_rules:
+            # Extract all text components efficiently
+            text_components = [
+                str(rule.get('business_description', '')),
+                str(rule.get('conditions', '')),
+                str(rule.get('actions', ''))
+            ]
+            
+            # Handle source_code_lines efficiently
+            source_lines = rule.get('source_code_lines', '')
+            if isinstance(source_lines, list):
+                text_components.append(" ".join(str(line) for line in source_lines))
+            else:
+                text_components.append(str(source_lines))
+            
+            # Join and convert to lowercase once per rule
+            rule_text_lower = " ".join(text_components).lower()
+            total_text_parts.append(rule_text_lower)
+        
+        # Combine all text and perform single-pass keyword detection
+        total_text_lower = " ".join(total_text_parts)
+        
+        # Single pass through text: find all keyword occurrences at once
+        words = total_text_lower.split()  # More efficient than repeated .count() calls
+        word_counts = {}
+        
+        # Count word frequencies in single pass
+        for word in words:
+            word_counts[word] = word_counts.get(word, 0) + 1
+        
+        # Score domains based on keyword frequencies (single pass through keyword mapping)
+        for keyword_lower, domain_info_list in keyword_mapping.items():
+            if keyword_lower in word_counts:
+                count = word_counts[keyword_lower]
+                # Apply score to all domains that use this keyword
+                for domain, weight, original_keyword in domain_info_list:
+                    domain_scores[domain] += count * weight
+                    detected_keywords_set.add(original_keyword)
+        
+        # Handle multi-word keywords with optimized search
+        for keyword_lower, domain_info_list in keyword_mapping.items():
+            if ' ' in keyword_lower and keyword_lower in total_text_lower:
+                # Multi-word keyword found, count occurrences efficiently
+                count = total_text_lower.count(keyword_lower)
+                if count > 0:
+                    for domain, weight, original_keyword in domain_info_list:
+                        domain_scores[domain] += count * weight
+                        detected_keywords_set.add(original_keyword)
+        
+        # Calculate results efficiently
         total_score = sum(domain_scores.values())
         if total_score == 0:
             return {
@@ -299,28 +338,24 @@ class RuleDocumentationGeneratorAgent(BaseAgent):
                 'is_multi_domain': False
             }
         
-        # Calculate percentages
-        domain_percentages = {domain: (score / total_score) * 100 
-                            for domain, score in domain_scores.items() 
-                            if score > 0}
+        # Calculate percentages and find primary domain in single pass
+        domain_percentages = {}
+        primary_domain = None
+        primary_score = 0
         
-        # Find primary domain
-        primary_domain = max(domain_scores, key=domain_scores.get)
-        primary_confidence = domain_percentages.get(primary_domain, 0.0)
+        for domain, score in domain_scores.items():
+            if score > 0:
+                percentage = (score / total_score) * 100
+                domain_percentages[domain] = percentage
+                if score > primary_score:
+                    primary_score = score
+                    primary_domain = domain
         
-        # Check if multi-domain (more than one domain with >20% score) - O(1) lookup with set
+        primary_confidence = domain_percentages.get(primary_domain, 0.0) if primary_domain else 0.0
+        
+        # Check for multi-domain efficiently
         significant_domains = [domain for domain, pct in domain_percentages.items() if pct >= 20.0]
         is_multi_domain = len(significant_domains) > 1
-        
-        # Extract detected keywords for context - use set to avoid duplicates and improve performance
-        detected_keywords_set = set()
-        domains_with_scores = {domain for domain, score in domain_scores.items() if score > 0}
-        
-        for domain in domains_with_scores:
-            config = domain_keywords[domain]
-            for keyword in config['keywords']:
-                if keyword.lower() in total_text_lower:
-                    detected_keywords_set.add(keyword)
         
         detected_keywords = list(detected_keywords_set)
         

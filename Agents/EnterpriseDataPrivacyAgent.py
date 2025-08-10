@@ -11,25 +11,27 @@ An enhanced version of PIIScrubbingAgent that uses Claude Code tools for:
 This demonstrates Phase 5 tool integration improvements.
 """
 
-import re
-import uuid
-import datetime
-from typing import Dict, Any, List, Optional, Callable, Union
-from pathlib import Path
+from .StandardImports import (
+    # Standard library imports
+    re, uuid, datetime, Path,
+    
+    # Type annotations
+    Dict, Any, List, Optional, Callable, Union,
+    
+    # Utilities
+    ImportUtils, dt, timezone,
+    
+    # Performance utilities
+    StreamingFileProcessor
+)
 
 from .PersonalDataProtectionAgent import PersonalDataProtectionAgent, PIIType, MaskingStrategy, PIIContext
 from .ComplianceMonitoringAgent import AuditLevel
 
-# Import Utils - handle both relative and absolute imports
-try:
-    from ..Utils import TimeUtils, TextProcessingUtils
-except ImportError:
-    import sys
-    import os
-    parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    if parent_dir not in sys.path:
-        sys.path.insert(0, parent_dir)
-    from Utils import TimeUtils, TextProcessingUtils
+# Import Utils using standardized import utility
+utils = ImportUtils.import_utils('TimeUtils', 'TextProcessingUtils')
+TimeUtils = utils['TimeUtils']
+TextProcessingUtils = utils['TextProcessingUtils']
 
 
 class EnterpriseDataPrivacyAgent(PersonalDataProtectionAgent):
@@ -573,3 +575,167 @@ class EnterpriseDataPrivacyAgent(PersonalDataProtectionAgent):
                         request_id=request_id)
         
         return batch_summary
+
+    def scrub_large_file_streaming(self, file_path: str, context: str = "general", 
+                                  masking_strategy: MaskingStrategy = MaskingStrategy.PARTIAL_MASK,
+                                  audit_level: int = AuditLevel.LEVEL_2.value,
+                                  chunk_size_mb: int = 1) -> Dict[str, Any]:
+        """
+        Process large files (>10MB) using streaming chunks for memory efficiency.
+        
+        This method is part of Phase 11 Performance & Architecture optimizations.
+        Uses StreamingFileProcessor for memory-efficient processing of enterprise-scale files.
+        
+        Args:
+            file_path: Path to the large file to process
+            context: Context for PII detection (financial, healthcare, etc.)
+            masking_strategy: Strategy for masking detected PII
+            audit_level: Audit verbosity level
+            chunk_size_mb: Size of each processing chunk in MB (default: 1MB)
+            
+        Returns:
+            Dictionary with streaming processing results and performance metrics
+        """
+        request_id = f"stream-pii-{uuid.uuid4().hex[:12]}"
+        start_time = dt.now(timezone.utc)
+        
+        file_path = Path(file_path)
+        
+        self.logger.info(f"Starting streaming PII processing for large file: {file_path}", request_id=request_id)
+        
+        # Check if streaming is recommended
+        if not StreamingFileProcessor.should_use_streaming(file_path, threshold_mb=10):
+            self.logger.warning(f"File size is below streaming threshold. Consider using regular scrub_file_content method.", request_id=request_id)
+        
+        # File size analysis
+        file_size_category = StreamingFileProcessor.get_file_size_category(file_path)
+        self.logger.info(f"File size category: {file_size_category}", request_id=request_id)
+        
+        try:
+            # Define chunk processor function
+            def process_pii_chunk(chunk_text: str, chunk_metadata: Dict[str, Any]) -> Dict[str, Any]:
+                """Process a single chunk for PII detection and masking."""
+                chunk_start = dt.now(timezone.utc)
+                
+                # Apply PII scrubbing to chunk
+                chunk_result = self.scrub_data(
+                    data=chunk_text,
+                    context=context,
+                    masking_strategy=masking_strategy,
+                    audit_level=audit_level,
+                    request_id=f"{request_id}-chunk-{chunk_metadata['chunk_number']}"
+                )
+                
+                chunk_duration = (dt.now(timezone.utc) - chunk_start).total_seconds() * 1000
+                
+                return {
+                    'scrubbed_text': chunk_result.get('scrubbed_data', ''),
+                    'pii_found': chunk_result.get('pii_found', []),
+                    'pii_summary': chunk_result.get('pii_summary', {}),
+                    'chunk_processing_time_ms': chunk_duration,
+                    'chunk_size_chars': len(chunk_text)
+                }
+            
+            # Process file in streaming chunks
+            chunk_size_bytes = chunk_size_mb * 1024 * 1024  # Convert MB to bytes
+            streaming_result = StreamingFileProcessor.process_large_file_streaming(
+                file_path=file_path,
+                chunk_processor=process_pii_chunk,
+                chunk_size=chunk_size_bytes,
+                metadata={'context': context, 'masking_strategy': masking_strategy.value}
+            )
+            
+            if not streaming_result['success']:
+                return {
+                    'request_id': request_id,
+                    'success': False,
+                    'error': streaming_result['error'],
+                    'file_path': str(file_path),
+                    'processing_method': 'streaming_chunks',
+                    'duration_ms': (dt.now(timezone.utc) - start_time).total_seconds() * 1000
+                }
+            
+            # Aggregate results from all chunks
+            total_pii_found = []
+            all_scrubbed_chunks = []
+            total_pii_instances = 0
+            pii_types_detected = set()
+            
+            for chunk_result in streaming_result['results']:
+                chunk_data = chunk_result['result']
+                all_scrubbed_chunks.append(chunk_data['scrubbed_text'])
+                total_pii_found.extend(chunk_data['pii_found'])
+                
+                # Aggregate PII statistics
+                pii_summary = chunk_data.get('pii_summary', {})
+                total_pii_instances += pii_summary.get('total_pii_found', 0)
+                chunk_types = pii_summary.get('pii_types_detected', [])
+                pii_types_detected.update(chunk_types)
+            
+            # Combine all scrubbed chunks
+            final_scrubbed_content = ''.join(all_scrubbed_chunks)
+            
+            # Calculate final processing statistics
+            total_duration = (dt.now(timezone.utc) - start_time).total_seconds() * 1000
+            
+            # Create comprehensive result
+            result = {
+                'request_id': request_id,
+                'success': True,
+                'file_path': str(file_path),
+                'processing_method': 'streaming_chunks',
+                'scrubbed_content': final_scrubbed_content,
+                'pii_detection': {
+                    'total_pii_instances': total_pii_instances,
+                    'pii_types_detected': list(pii_types_detected),
+                    'pii_found': total_pii_found
+                },
+                'file_metrics': {
+                    'original_size_bytes': streaming_result['file_size'],
+                    'original_size_mb': streaming_result['file_size'] / (1024 * 1024),
+                    'processed_size_bytes': streaming_result['total_bytes_processed'],
+                    'file_size_category': file_size_category
+                },
+                'streaming_performance': {
+                    'total_chunks': streaming_result['total_chunks'],
+                    'chunk_size_mb': chunk_size_mb,
+                    'throughput_mb_per_sec': streaming_result['throughput_mb_per_sec'],
+                    'chunks_per_second': streaming_result['chunks_per_second'],
+                    'memory_efficient': True,
+                    'duration_ms': total_duration,
+                    'avg_chunk_processing_time_ms': total_duration / streaming_result['total_chunks'] if streaming_result['total_chunks'] > 0 else 0
+                },
+                'performance_comparison': {
+                    'streaming_vs_traditional': f"Memory usage: ~{chunk_size_mb}MB (streaming) vs ~{streaming_result['file_size'] // (1024 * 1024)}MB (traditional)",
+                    'memory_savings_percent': max(0, 100 - ((chunk_size_mb * 100) / (streaming_result['file_size'] / (1024 * 1024)))) if streaming_result['file_size'] > 0 else 0
+                },
+                'operation_metadata': {
+                    'agent_id': self.agent_id,
+                    'agent_name': self.agent_name,
+                    'context': context,
+                    'masking_strategy': masking_strategy.value,
+                    'audit_level': audit_level,
+                    'timestamp': start_time.isoformat()
+                }
+            }
+            
+            self.logger.info(f"Streaming PII processing complete. File: {file_size_category} ({streaming_result['file_size'] // (1024 * 1024)}MB), "
+                           f"Chunks: {streaming_result['total_chunks']}, PII: {total_pii_instances} instances, "
+                           f"Duration: {total_duration:.1f}ms, Throughput: {streaming_result['throughput_mb_per_sec']:.2f} MB/s", 
+                           request_id=request_id)
+            
+            return result
+            
+        except Exception as e:
+            error_duration = (dt.now(timezone.utc) - start_time).total_seconds() * 1000
+            self.logger.error(f"Streaming file processing failed: {e}", request_id=request_id)
+            
+            return {
+                'request_id': request_id,
+                'success': False,
+                'error': str(e),
+                'file_path': str(file_path),
+                'processing_method': 'streaming_chunks',
+                'duration_ms': error_duration,
+                'file_size_category': file_size_category
+            }

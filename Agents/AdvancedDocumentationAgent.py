@@ -18,6 +18,9 @@ from .StandardImports import (
     # Type annotations  
     Dict, Any, List, Optional, Callable,
     
+    # Tool interface contracts
+    WriteToolInterface, ToolContainer,
+    
     # Utilities
     ImportUtils, dt, timezone, COMMON_PATTERNS
 )
@@ -180,7 +183,7 @@ class AdvancedDocumentationAgent(RuleDocumentationGeneratorAgent):
     
     def __init__(self, audit_system: ComplianceMonitoringAgent, llm_client = None, 
                  agent_id: str = None, log_level: int = 0, model_name: str = None,
-                 llm_provider = None, write_tool: Optional[Callable] = None):
+                 llm_provider = None, tools: Optional[ToolContainer] = None):
         """
         Initialize the AdvancedDocumentationAgent with BYO-LLM support.
         
@@ -191,7 +194,7 @@ class AdvancedDocumentationAgent(RuleDocumentationGeneratorAgent):
             log_level: Logging verbosity level
             model_name: Name of the LLM model being used (optional, inferred from provider)
             llm_provider: LLM provider instance or provider type string (defaults to Gemini)
-            write_tool: Claude Code Write tool function (injected for testing)
+            tools: Tool container with type-safe interfaces (replaces raw Callable injections)
         """
         super().__init__(
             audit_system=audit_system,
@@ -202,14 +205,15 @@ class AdvancedDocumentationAgent(RuleDocumentationGeneratorAgent):
             agent_name="AdvancedDocumentationAgent"
         )
         self.llm_client = llm_client
-        self.write_tool = write_tool
+        self.tools = tools or ToolContainer()  # Phase 11: Tool interface contracts
         
     def get_agent_info(self) -> Dict[str, Any]:
         """Get agent information including tool integration capabilities."""
         base_info = super().get_agent_info()
         base_info.update({
             "tool_integrations": {
-                "write_tool": self.write_tool is not None,
+                "available_tools": self.tools.get_available_tools(),
+                "write_tool": self.tools.has_write_tool(),
                 "file_operations": "atomic_writes",
                 "error_handling": "enhanced"
             },
@@ -314,9 +318,9 @@ class AdvancedDocumentationAgent(RuleDocumentationGeneratorAgent):
                 path_obj.parent.mkdir(parents=True, exist_ok=True)
                 
             # Use Write tool if available, otherwise fallback to standard file I/O
-            if self.write_tool:
+            if self.tools.has_write_tool():
                 try:
-                    self.write_tool(file_path=str(path_obj), content=content)
+                    self.tools.write_tool(file_path=str(path_obj), content=content)
                     operation_result = {
                         "success": True,
                         "method": "write_tool",
