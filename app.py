@@ -51,6 +51,7 @@ try:
     from Utils.time_utils import TimeUtils
     from Utils.config_loader import get_config_loader
     from api_docs import api_blueprint  # Import API documentation blueprint
+    from app_monitoring import apm_metrics, monitor_request, start_system_metrics_updater
 except ImportError as e:
     print(f"Error importing required modules: {e}")
     sys.exit(1)
@@ -383,6 +384,41 @@ def health_check():
     })
 
 
+@app.route('/api/v1/metrics', methods=['GET'])
+def prometheus_metrics():
+    """Prometheus metrics endpoint for monitoring."""
+    try:
+        metrics_output = apm_metrics.get_metrics()
+        from flask import Response
+        return Response(metrics_output, mimetype='text/plain')
+    except Exception as e:
+        logger.error(f"Metrics endpoint failed: {str(e)}")
+        return jsonify({'error': 'Metrics unavailable'}), 500
+
+
+@app.route('/api/v1/performance/summary', methods=['GET'])
+@require_auth
+def performance_summary():
+    """Get application performance summary."""
+    try:
+        time_window = request.args.get('time_window_minutes', 60, type=int)
+        summary = apm_metrics.get_performance_summary(time_window)
+        
+        return jsonify({
+            'status': 'success',
+            'timestamp': TimeUtils.get_current_utc_timestamp().isoformat(),
+            'performance_summary': summary
+        })
+        
+    except Exception as e:
+        logger.error(f"Performance summary failed: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'timestamp': TimeUtils.get_current_utc_timestamp().isoformat(),
+            'error': str(e)
+        }), 500
+
+
 @app.route('/api/v1/status', methods=['GET'])
 @require_auth
 @handle_request_timing
@@ -428,6 +464,7 @@ def system_status():
 @app.route('/api/v1/business-rule-extraction', methods=['POST'])
 @require_auth
 @handle_request_timing
+@monitor_request
 def business_rule_extraction():
     """Extract business rules from legacy code."""
     try:
@@ -497,6 +534,7 @@ def business_rule_extraction():
 @app.route('/api/v1/application-triage', methods=['POST'])
 @require_auth
 @handle_request_timing
+@monitor_request
 def application_triage():
     """Intelligent document routing and categorization."""
     try:
@@ -565,6 +603,7 @@ def application_triage():
 @app.route('/api/v1/personal-data-protection', methods=['POST'])
 @require_auth
 @handle_request_timing
+@monitor_request
 def personal_data_protection():
     """GDPR/CCPA compliant PII protection."""
     try:
@@ -635,6 +674,7 @@ def personal_data_protection():
 @app.route('/api/v1/rule-documentation', methods=['POST'])
 @require_auth
 @handle_request_timing
+@monitor_request
 def rule_documentation():
     """Generate business rule documentation."""
     try:
@@ -711,6 +751,7 @@ def rule_documentation():
 @app.route('/api/v1/compliance-monitoring', methods=['POST'])
 @require_auth
 @handle_request_timing
+@monitor_request
 def compliance_monitoring():
     """Audit trail and compliance management."""
     try:
@@ -806,6 +847,7 @@ def compliance_monitoring():
 @app.route('/api/v1/advanced-documentation', methods=['POST'])
 @require_auth
 @handle_request_timing
+@monitor_request
 def advanced_documentation():
     """Enhanced documentation with tool integration."""
     try:
@@ -895,6 +937,7 @@ def advanced_documentation():
 @app.route('/api/v1/enterprise-data-privacy', methods=['POST'])
 @require_auth
 @handle_request_timing
+@monitor_request
 def enterprise_data_privacy():
     """High-performance PII protection for large documents."""
     try:
@@ -1049,6 +1092,9 @@ def api_docs_info():
 # Initialize the application when module is imported
 try:
     initialize_application()
+    # Start APM system metrics collection
+    start_system_metrics_updater(update_interval=30)
+    logger.info("APM monitoring initialized successfully")
 except Exception as e:
     logger.error(f"Failed to initialize Flask application: {str(e)}")
     # Don't exit in production, let the app start and show errors via status endpoint

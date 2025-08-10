@@ -1,0 +1,289 @@
+# Prometheus Alerting Rules for Micro-Agent Platform
+# Application Performance Monitoring (APM) Alerts
+
+groups:
+  # ============================================================================
+  # HTTP Request Alerts
+  # ============================================================================
+  - name: http_requests
+    rules:
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 5
+        for: 2m
+        labels:
+          severity: critical
+          service: micro-agent-api
+        annotations:
+          summary: "High response time detected"
+          description: "95th percentile response time is {{ $value }}s for endpoint {{ $labels.endpoint }}"
+          
+      - alert: HighErrorRate
+        expr: |
+          (
+            rate(http_requests_total{status_code=~"4..|5.."}[5m]) / 
+            rate(http_requests_total[5m])
+          ) > 0.10
+        for: 2m
+        labels:
+          severity: critical
+          service: micro-agent-api
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} for endpoint {{ $labels.endpoint }}"
+          
+      - alert: HighRequestRate
+        expr: rate(http_requests_total[5m]) > 100
+        for: 5m
+        labels:
+          severity: warning
+          service: micro-agent-api
+        annotations:
+          summary: "High request rate detected"
+          description: "Request rate is {{ $value }} req/s for endpoint {{ $labels.endpoint }}"
+
+  # ============================================================================
+  # Agent Performance Alerts
+  # ============================================================================
+  - name: agent_performance
+    rules:
+      - alert: SlowAgentProcessing
+        expr: |
+          (
+            rate(agent_processing_duration_seconds_sum[5m]) / 
+            rate(agent_processing_duration_seconds_count[5m])
+          ) > 30
+        for: 3m
+        labels:
+          severity: warning
+          service: micro-agent-api
+        annotations:
+          summary: "Slow agent processing detected"
+          description: "{{ $labels.agent_type }} {{ $labels.operation }} taking {{ $value }}s on average"
+          
+      - alert: AgentOperationFailures
+        expr: rate(agent_operations_total{status="error"}[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+          service: micro-agent-api
+        annotations:
+          summary: "High agent operation failure rate"
+          description: "{{ $labels.agent_type }} {{ $labels.operation }} failing at {{ $value }} operations/sec"
+
+  # ============================================================================
+  # LLM Provider Alerts
+  # ============================================================================
+  - name: llm_providers
+    rules:
+      - alert: LLMProviderErrors
+        expr: rate(llm_requests_total{status="error"}[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+          service: micro-agent-api
+        annotations:
+          summary: "LLM provider errors detected"
+          description: "{{ $labels.provider }} {{ $labels.model }} error rate is {{ $value }} req/s"
+          
+      - alert: SlowLLMRequests
+        expr: |
+          (
+            rate(llm_request_duration_seconds_sum[5m]) / 
+            rate(llm_request_duration_seconds_count[5m])
+          ) > 60
+        for: 3m
+        labels:
+          severity: warning
+          service: micro-agent-api
+        annotations:
+          summary: "Slow LLM requests detected"
+          description: "{{ $labels.provider }} {{ $labels.model }} requests taking {{ $value }}s on average"
+          
+      - alert: HighTokenUsage
+        expr: rate(llm_tokens_total[5m]) > 10000
+        for: 5m
+        labels:
+          severity: info
+          service: micro-agent-api
+        annotations:
+          summary: "High token usage detected"
+          description: "{{ $labels.provider }} {{ $labels.type }} tokens: {{ $value }} tokens/s"
+
+  # ============================================================================
+  # System Resource Alerts
+  # ============================================================================
+  - name: system_resources
+    rules:
+      - alert: HighCPUUsage
+        expr: cpu_usage_percent > 90
+        for: 2m
+        labels:
+          severity: critical
+          service: micro-agent-api
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is {{ $value }}%"
+          
+      - alert: HighMemoryUsage
+        expr: memory_usage_bytes{type="percent"} > 90
+        for: 2m
+        labels:
+          severity: critical
+          service: micro-agent-api
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is {{ $value }}%"
+          
+      - alert: LowMemoryAvailable
+        expr: memory_usage_bytes{type="available"} < 1073741824  # 1GB in bytes
+        for: 1m
+        labels:
+          severity: warning
+          service: micro-agent-api
+        annotations:
+          summary: "Low memory available"
+          description: "Available memory is {{ $value | humanizeBytes }}"
+
+  # ============================================================================
+  # Application Health Alerts
+  # ============================================================================
+  - name: application_health
+    rules:
+      - alert: ServiceDown
+        expr: up{job="micro-agent-api"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          service: micro-agent-api
+        annotations:
+          summary: "Service is down"
+          description: "Micro-Agent API service is not responding"
+          
+      - alert: HealthCheckFailing
+        expr: probe_success{job="blackbox"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: micro-agent-api
+        annotations:
+          summary: "Health check failing"
+          description: "Health check probe is failing for {{ $labels.instance }}"
+
+  # ============================================================================
+  # PII Protection Alerts
+  # ============================================================================
+  - name: pii_protection
+    rules:
+      - alert: HighPIIDetectionRate
+        expr: rate(pii_detections_total[5m]) > 50
+        for: 5m
+        labels:
+          severity: info
+          service: micro-agent-api
+        annotations:
+          summary: "High PII detection rate"
+          description: "PII detection rate is {{ $value }} detections/s for {{ $labels.pii_type }}"
+          
+      - alert: UnmaskedPIIDetected
+        expr: rate(pii_detections_total{masked="no"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: micro-agent-api
+        annotations:
+          summary: "Unmasked PII detected"
+          description: "PII type {{ $labels.pii_type }} detected but not masked in {{ $labels.context }}"
+
+  # ============================================================================
+  # Cache Performance Alerts
+  # ============================================================================
+  - name: cache_performance
+    rules:
+      - alert: LowCacheHitRate
+        expr: |
+          (
+            rate(cache_operations_total{result="hit"}[5m]) / 
+            rate(cache_operations_total[5m])
+          ) < 0.5
+        for: 5m
+        labels:
+          severity: warning
+          service: micro-agent-api
+        annotations:
+          summary: "Low cache hit rate"
+          description: "Cache hit rate is {{ $value | humanizePercentage }}"
+
+  # ============================================================================
+  # Business Metrics Alerts
+  # ============================================================================
+  - name: business_metrics
+    rules:
+      - alert: NoBusinessRulesExtracted
+        expr: rate(business_rules_extracted_total[30m]) == 0
+        for: 15m
+        labels:
+          severity: warning
+          service: micro-agent-api
+        annotations:
+          summary: "No business rules extracted recently"
+          description: "No business rules have been extracted in the last 30 minutes"
+          
+      - alert: HighComplexityRuleProcessing
+        expr: rate(business_rules_extracted_total{complexity="high"}[5m]) > 0.5
+        for: 5m
+        labels:
+          severity: info
+          service: micro-agent-api
+        annotations:
+          summary: "High complexity rule processing"
+          description: "Processing {{ $value }} high-complexity rules/s in {{ $labels.domain }}"
+
+  # ============================================================================
+  # Error Pattern Alerts
+  # ============================================================================
+  - name: error_patterns
+    rules:
+      - alert: HighErrorCount
+        expr: rate(errors_total[5m]) > 1
+        for: 2m
+        labels:
+          severity: warning
+          service: micro-agent-api
+        annotations:
+          summary: "High error count detected"
+          description: "{{ $labels.error_type }} errors in {{ $labels.component }}: {{ $value }} errors/s"
+          
+      - alert: CriticalErrorSpike
+        expr: rate(errors_total{severity="critical"}[5m]) > 0.1
+        for: 30s
+        labels:
+          severity: critical
+          service: micro-agent-api
+        annotations:
+          summary: "Critical error spike detected"
+          description: "Critical {{ $labels.error_type }} errors in {{ $labels.component }}: {{ $value }} errors/s"
+
+  # ============================================================================
+  # Connection and Networking Alerts
+  # ============================================================================
+  - name: networking
+    rules:
+      - alert: HighActiveConnections
+        expr: active_connections_total > 1000
+        for: 5m
+        labels:
+          severity: warning
+          service: micro-agent-api
+        annotations:
+          summary: "High number of active connections"
+          description: "Active connections: {{ $value }}"
+          
+      - alert: ConnectionPoolExhaustion
+        expr: active_connections_total > 5000
+        for: 1m
+        labels:
+          severity: critical
+          service: micro-agent-api
+        annotations:
+          summary: "Connection pool near exhaustion"
+          description: "Active connections: {{ $value }}"

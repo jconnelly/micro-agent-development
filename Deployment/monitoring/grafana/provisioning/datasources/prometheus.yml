@@ -1,3 +1,6 @@
+# Grafana Data Source Provisioning Configuration
+# Automatically configures Prometheus data source
+
 apiVersion: 1
 
 datasources:
@@ -6,6 +9,7 @@ datasources:
     access: proxy
     url: http://prometheus:9090
     isDefault: true
+    version: 1
     editable: true
     jsonData:
       httpMethod: POST
@@ -15,3 +19,6 @@ datasources:
       cacheLevel: 'High'
       disableRecordingRules: false
       incrementalQueryOverlapWindow: 10m
+      queryTimeout: 60s
+    secureJsonFields: {}
+    uid: prometheus-uid

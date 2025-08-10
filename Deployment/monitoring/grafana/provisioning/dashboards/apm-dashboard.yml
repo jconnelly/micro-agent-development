@@ -1,0 +1,14 @@
+# Grafana Dashboard Provisioning Configuration
+# Automatically loads APM dashboard on startup
+
+apiVersion: 1
+
+providers:
+  - name: 'micro-agent-apm'
+    orgId: 1
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards

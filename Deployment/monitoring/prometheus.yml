@@ -9,6 +9,7 @@ global:
 # Rule files for alerting
 rule_files:
   - "alert_rules.yml"
+  - "alerting-rules.yml"
 
 # Scrape configurations
 scrape_configs:

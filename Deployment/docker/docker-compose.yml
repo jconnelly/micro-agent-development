@@ -93,6 +93,7 @@ services:
       - "${PROMETHEUS_PORT:-9090}:9090"
     volumes:
       - ../monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../monitoring/alerting-rules.yml:/etc/prometheus/alerting-rules.yml:ro
       - micro-agent-prometheus-data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -120,6 +121,7 @@ services:
     volumes:
       - micro-agent-grafana-data:/var/lib/grafana
       - ../monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../monitoring/apm-dashboard.json:/etc/grafana/provisioning/dashboards/apm-dashboard.json:ro
     networks:
       - micro-agent-network
     profiles:
