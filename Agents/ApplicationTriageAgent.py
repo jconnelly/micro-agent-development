@@ -201,7 +201,7 @@ class ApplicationTriageAgent(BaseAgent):
         )
     # _api_call_with_retry_async() method now inherited from BaseAgent
     
-    async def _make_api_call_async(self, submission_data: Dict[str, Any], request_id: str):
+    async def _make_api_call_async(self, submission_data: Dict[str, Any], request_id: str) -> Dict[str, Any]:
         """
         Make the actual API call in a thread pool to avoid blocking.
         This is a placeholder for the real LLM API call.

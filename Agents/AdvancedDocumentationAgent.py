@@ -11,25 +11,23 @@ An enhanced version of RuleDocumentationAgent that uses Claude Code tools for:
 This demonstrates Phase 5 tool integration improvements.
 """
 
-import json
-import uuid
-import datetime
-from typing import Dict, Any, List, Optional, Callable
-from pathlib import Path
+from .StandardImports import (
+    # Standard library imports
+    json, uuid, datetime, os, re, Path,
+    
+    # Type annotations  
+    Dict, Any, List, Optional, Callable,
+    
+    # Utilities
+    ImportUtils, dt, timezone, COMMON_PATTERNS
+)
 
 from .RuleDocumentationGeneratorAgent import RuleDocumentationGeneratorAgent
 from .ComplianceMonitoringAgent import ComplianceMonitoringAgent, AuditLevel
 
-# Import Utils - handle both relative and absolute imports
-try:
-    from ..Utils import TimeUtils
-except ImportError:
-    import sys
-    import os
-    parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    if parent_dir not in sys.path:
-        sys.path.insert(0, parent_dir)
-    from Utils import TimeUtils
+# Import Utils using standardized import utility
+utils = ImportUtils.import_utils('TimeUtils')
+TimeUtils = utils['TimeUtils']
 
 
 class AdvancedDocumentationAgent(RuleDocumentationGeneratorAgent):
@@ -224,6 +222,75 @@ class AdvancedDocumentationAgent(RuleDocumentationGeneratorAgent):
         })
         return base_info
     
+    def _sanitize_path_component(self, component: str) -> str:
+        """
+        Sanitize a path component to prevent path traversal attacks.
+        
+        Args:
+            component: Path component to sanitize
+            
+        Returns:
+            Sanitized path component safe for filesystem use
+        """
+        if not component:
+            return "default"
+        
+        # Remove path traversal characters and other dangerous elements using standardized pattern
+        sanitized = COMMON_PATTERNS['safe_filename'].sub('_', component)
+        
+        # Remove path traversal sequences using standardized pattern
+        sanitized = COMMON_PATTERNS['path_traversal'].sub('_', sanitized)
+        
+        # Ensure it's not empty after sanitization
+        if not sanitized or sanitized.isspace():
+            sanitized = "sanitized"
+            
+        # Limit length to prevent filesystem issues
+        if len(sanitized) > 100:
+            sanitized = sanitized[:100]
+            
+        return sanitized
+    
+    def _validate_output_directory(self, directory: str, base_allowed_path: str = None) -> Path:
+        """
+        Validate and sanitize output directory to prevent path traversal.
+        
+        Args:
+            directory: Directory path to validate
+            base_allowed_path: Base path that output must be within (optional)
+            
+        Returns:
+            Validated Path object
+            
+        Raises:
+            ValueError: If path is invalid or attempts path traversal
+        """
+        try:
+            # Convert to Path object and resolve to absolute path
+            path = Path(directory).resolve()
+            
+            # If base path specified, ensure output is within allowed area
+            if base_allowed_path:
+                base_path = Path(base_allowed_path).resolve()
+                
+                # Check if the path is within the allowed base directory
+                try:
+                    path.relative_to(base_path)
+                except ValueError:
+                    # Path is outside the allowed directory
+                    sanitized_name = self._sanitize_path_component(Path(directory).name)
+                    path = base_path / sanitized_name
+                    
+            return path
+            
+        except (OSError, ValueError) as e:
+            # If path resolution fails, create a safe fallback
+            safe_name = self._sanitize_path_component(str(directory))
+            if base_allowed_path:
+                return Path(base_allowed_path) / safe_name
+            else:
+                return Path("safe_documentation") / safe_name
+    
     def _write_file_with_tool(self, file_path: str, content: str, request_id: str) -> Dict[str, Any]:
         """
         Write file using Claude Code Write tool with enhanced error handling.
@@ -236,7 +303,7 @@ class AdvancedDocumentationAgent(RuleDocumentationGeneratorAgent):
         Returns:
             Dictionary with operation result and metadata
         """
-        operation_start = datetime.datetime.now(datetime.timezone.utc)
+        operation_start = dt.now(timezone.utc)
         
         try:
             # Validate path
@@ -277,7 +344,7 @@ class AdvancedDocumentationAgent(RuleDocumentationGeneratorAgent):
             
         return operation_result
     
-    def _write_file_standard(self, path_obj: Path, content: str, request_id: str, operation_start: datetime.datetime) -> Dict[str, Any]:
+    def _write_file_standard(self, path_obj: Path, content: str, request_id: str, operation_start: dt) -> Dict[str, Any]:
         """
         Fallback method for standard file I/O operations.
         
@@ -329,7 +396,7 @@ class AdvancedDocumentationAgent(RuleDocumentationGeneratorAgent):
             Dictionary with documentation results and file operation metadata
         """
         request_id = f"tool-doc-{uuid.uuid4().hex}"
-        start_time = datetime.datetime.now(datetime.timezone.utc)
+        start_time = dt.now(timezone.utc)
         
         if output_formats is None:
             output_formats = ['markdown', 'json']
@@ -345,13 +412,16 @@ class AdvancedDocumentationAgent(RuleDocumentationGeneratorAgent):
         refined_rules = base_result.get('refined_rules', [])
         domain_info = base_result.get('domain_info', {})
         
-        # Prepare output directory
-        output_path = Path(output_directory)
+        # Validate and prepare output directory (security fix for path traversal)
+        output_path = self._validate_output_directory(output_directory, os.getcwd())
         output_path.mkdir(parents=True, exist_ok=True)
         
         # Generate timestamp for filenames
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        domain_name = domain_info.get('primary_domain', 'general')
+        timestamp = dt.now().strftime("%Y%m%d_%H%M%S")
+        
+        # Sanitize domain name to prevent path traversal (security fix)
+        raw_domain_name = domain_info.get('primary_domain', 'general')
+        domain_name = self._sanitize_path_component(raw_domain_name)
         base_filename = f"business_rules_{domain_name}_{timestamp}"
         
         # Generate and save documentation in all requested formats
@@ -488,15 +558,15 @@ class AdvancedDocumentationAgent(RuleDocumentationGeneratorAgent):
             Dictionary with batch processing results
         """
         request_id = f"batch-doc-{uuid.uuid4().hex}"
-        start_time = datetime.datetime.now(datetime.timezone.utc)
+        start_time = dt.now(timezone.utc)
         
         if output_formats is None:
             output_formats = ['markdown', 'json']
             
         self.logger.info(f"Starting batch documentation for {len(rule_sets)} rule sets", request_id=request_id)
         
-        # Prepare base output directory
-        base_path = Path(output_base_directory)
+        # Validate and prepare base output directory (security fix for path traversal)
+        base_path = self._validate_output_directory(output_base_directory, os.getcwd())
         base_path.mkdir(parents=True, exist_ok=True)
         
         batch_results = []
@@ -507,7 +577,10 @@ class AdvancedDocumentationAgent(RuleDocumentationGeneratorAgent):
             try:
                 rules = rule_set.get('rules', [])
                 metadata = rule_set.get('metadata', {})
-                set_name = metadata.get('name', f'ruleset_{i+1}')
+                raw_set_name = metadata.get('name', f'ruleset_{i+1}')
+                
+                # Sanitize set name to prevent path traversal (security fix)
+                set_name = self._sanitize_path_component(raw_set_name)
                 
                 # Create subdirectory for this rule set
                 set_directory = base_path / set_name

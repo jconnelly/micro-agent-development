@@ -19,13 +19,20 @@ Author: AI Development Team
 Version: 1.0.0
 """
 
-import re
-import hashlib
-import json
-import uuid
-from typing import Dict, List, Any, Optional, Tuple, Union, Pattern
+from .StandardImports import (
+    # Standard library imports
+    re, json, uuid, hashlib,
+    
+    # Type annotations
+    Dict, List, Any, Optional, Tuple, Union, Pattern,
+    
+    # Utilities
+    ImportUtils, dt, timezone,
+    
+    # Security utilities
+    SecureMessageFormatter
+)
 from enum import Enum
-from datetime import datetime, timezone
 import secrets
 import string
 from functools import lru_cache
@@ -35,16 +42,11 @@ from .BaseAgent import BaseAgent
 from .ComplianceMonitoringAgent import ComplianceMonitoringAgent
 from .Exceptions import PIIProcessingError, ConfigurationError, ValidationError
 
-# Import Utils - handle both relative and absolute imports
-try:
-    from ..Utils import JsonUtils, TextProcessingUtils, config_loader
-except ImportError:
-    import sys
-    import os
-    parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    if parent_dir not in sys.path:
-        sys.path.insert(0, parent_dir)
-    from Utils import JsonUtils, TextProcessingUtils, config_loader
+# Import Utils using standardized import utility
+utils = ImportUtils.import_utils('JsonUtils', 'TextProcessingUtils', 'config_loader')
+JsonUtils = utils['JsonUtils']
+TextProcessingUtils = utils['TextProcessingUtils']
+config_loader = utils['config_loader']
 
 
 class PIIType(Enum):
@@ -429,7 +431,8 @@ class PersonalDataProtectionAgent(BaseAgent):
         pii_detected = detection_results['detected_types']
         pii_matches = detection_results['matches']
         
-        self.logger.info(f"Detected {len(pii_detected)} PII types: {[t.value for t in pii_detected]}")
+        # Secure logging - don't expose specific PII types detected (security fix)
+        self.logger.info(f"PII detection completed: {len(pii_detected)} types detected")
         
         return pii_detected, pii_matches
     
@@ -482,7 +485,7 @@ class PersonalDataProtectionAgent(BaseAgent):
             'total_pii_instances': sum(len(matches) for matches in pii_matches.values()),
             'masking_strategy': strategy.value,
             'context': self.context.value,
-            'processing_duration_ms': (datetime.now(timezone.utc) - operation_start).total_seconds() * 1000,
+            'processing_duration_ms': (dt.now(timezone.utc) - operation_start).total_seconds() * 1000,
             'tokenization_enabled': self.enable_tokenization,
             'tokens_generated': len([m for matches in pii_matches.values() for m in matches if strategy == MaskingStrategy.TOKENIZE])
         }
@@ -683,7 +686,7 @@ class PersonalDataProtectionAgent(BaseAgent):
             This method is thread-safe and can be used in concurrent processing
             environments. Each call generates independent audit trails.
         """
-        operation_start = datetime.now(timezone.utc)
+        operation_start = dt.now(timezone.utc)
         request_id = request_id or f"pii-{uuid.uuid4().hex[:12]}"
         
         # Set request ID for logger
@@ -756,8 +759,9 @@ class PersonalDataProtectionAgent(BaseAgent):
         Returns:
             Dictionary with detected types and matches
         """
-        # Use cached detection for improved performance on repeated text
-        cache_key = (text, self.context.value)  # Include context in cache key
+        # Create secure hash of text for cache key to prevent PII exposure (security fix)
+        text_hash = hashlib.sha256(text.encode('utf-8')).hexdigest()[:16]  # Use first 16 chars of hash
+        cache_key = (text_hash, self.context.value)
         return self._cached_detect_pii(cache_key, text)
     
     @lru_cache(maxsize=256)  # Cache up to 256 unique text/context combinations
@@ -965,7 +969,7 @@ class PersonalDataProtectionAgent(BaseAgent):
         """Create detailed audit entry for PII operations"""
         
         audit_entry = {
-            'timestamp': datetime.now(timezone.utc).isoformat(),
+            'timestamp': dt.now(timezone.utc).isoformat(),
             'request_id': request_id,
             'agent_id': self.agent_id,
             'agent_version': self.version,

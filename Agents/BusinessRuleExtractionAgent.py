@@ -304,7 +304,7 @@ class BusinessRuleExtractionAgent(BaseAgent):
     
     # _api_call_with_retry_async() method now inherited from BaseAgent
     
-    async def _make_api_call_async(self, prompt: str):
+    async def _make_api_call_async(self, prompt: str) -> Dict[str, Any]:
         """
         Make the actual API call in a thread pool to avoid blocking.
         """
