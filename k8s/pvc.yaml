@@ -1,0 +1,89 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-pvc
+  namespace: micro-agent-platform
+  labels:
+    app.kubernetes.io/name: micro-agent-redis
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/version: "7.0"
+    app.kubernetes.io/part-of: micro-agent-platform
+  annotations:
+    description: "Persistent storage for Redis data"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: fast-ssd  # Use fast storage class for Redis
+  # Alternative storage classes based on cloud provider:
+  # storageClassName: gp3              # AWS EBS GP3
+  # storageClassName: premium-rwo      # GCP Persistent Disk SSD
+  # storageClassName: managed-premium  # Azure Premium SSD
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus-pvc
+  namespace: micro-agent-platform
+  labels:
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/version: "2.40"
+    app.kubernetes.io/part-of: micro-agent-platform
+  annotations:
+    description: "Persistent storage for Prometheus metrics data"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi  # Larger storage for metrics retention
+  storageClassName: standard-ssd
+  # Alternative: Use different storage class based on retention needs
+  # storageClassName: standard  # For cost optimization with longer retention
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-pvc
+  namespace: micro-agent-platform
+  labels:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/version: "9.5"
+    app.kubernetes.io/part-of: micro-agent-platform
+  annotations:
+    description: "Persistent storage for Grafana dashboards and configuration"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: standard-ssd
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: app-logs-pvc
+  namespace: micro-agent-platform
+  labels:
+    app.kubernetes.io/name: micro-agent-api
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/part-of: micro-agent-platform
+  annotations:
+    description: "Persistent storage for application logs (optional - can use centralized logging instead)"
+spec:
+  accessModes:
+    - ReadWriteMany  # Multiple pods can write logs
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: standard
+  # Note: Consider using centralized logging (ELK stack, Fluentd, etc.) instead of persistent volumes

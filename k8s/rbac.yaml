@@ -1,0 +1,179 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: micro-agent-service-account
+  namespace: micro-agent-platform
+  labels:
+    app.kubernetes.io/name: micro-agent-platform
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/version: "1.0.0"
+  annotations:
+    description: "Service account for Micro-Agent API pods"
+    # AWS EKS IRSA annotation (if using AWS)
+    # eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/MicroAgentRole
+    # GCP Workload Identity annotation (if using GCP)
+    # iam.gke.io/gcp-service-account: micro-agent@PROJECT_ID.iam.gserviceaccount.com
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: micro-agent-role
+  namespace: micro-agent-platform
+  labels:
+    app.kubernetes.io/name: micro-agent-platform
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/version: "1.0.0"
+rules:
+  # Allow reading ConfigMaps (for configuration management)
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+  
+  # Allow reading Secrets (for API keys and sensitive config)
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list"]
+  
+  # Allow reading pod information (for health checks and debugging)
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  
+  # Allow reading services (for service discovery)
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list"]
+  
+  # Allow reading events (for troubleshooting)
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: micro-agent-role-binding
+  namespace: micro-agent-platform
+  labels:
+    app.kubernetes.io/name: micro-agent-platform
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/version: "1.0.0"
+subjects:
+  - kind: ServiceAccount
+    name: micro-agent-service-account
+    namespace: micro-agent-platform
+roleRef:
+  kind: Role
+  name: micro-agent-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus-service-account
+  namespace: micro-agent-platform
+  labels:
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/version: "2.40"
+  annotations:
+    description: "Service account for Prometheus monitoring"
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prometheus-cluster-role
+  labels:
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/version: "2.40"
+rules:
+  # Allow Prometheus to discover and scrape targets
+  - apiGroups: [""]
+    resources: ["nodes", "nodes/proxy", "services", "endpoints", "pods"]
+    verbs: ["get", "list", "watch"]
+    
+  # Allow access to ingress resources for discovery
+  - apiGroups: ["extensions", "networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch"]
+    
+  # Allow access to network policies
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus-cluster-role-binding
+  labels:
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/version: "2.40"
+subjects:
+  - kind: ServiceAccount
+    name: prometheus-service-account
+    namespace: micro-agent-platform
+roleRef:
+  kind: ClusterRole
+  name: prometheus-cluster-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: grafana-service-account
+  namespace: micro-agent-platform
+  labels:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/version: "9.5"
+  annotations:
+    description: "Service account for Grafana dashboards"
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: grafana-role
+  namespace: micro-agent-platform
+  labels:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/version: "9.5"
+rules:
+  # Allow Grafana to read ConfigMaps for dashboard provisioning
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+    
+  # Allow reading secrets for data source credentials
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: grafana-role-binding
+  namespace: micro-agent-platform
+  labels:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/version: "9.5"
+subjects:
+  - kind: ServiceAccount
+    name: grafana-service-account
+    namespace: micro-agent-platform
+roleRef:
+  kind: Role
+  name: grafana-role
+  apiGroup: rbac.authorization.k8s.io

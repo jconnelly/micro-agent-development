@@ -1,0 +1,77 @@
+# Prometheus Configuration for Micro-Agent Development Platform
+# Comprehensive monitoring setup for production deployment
+
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+
+# Rule files for alerting
+rule_files:
+  - "alert_rules.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+  # Micro-Agent API monitoring
+  - job_name: 'micro-agent-api'
+    static_configs:
+      - targets: ['micro-agent-api:8000']
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    metrics_path: /api/v1/metrics
+    params:
+      format: ['prometheus']
+    basic_auth:
+      username: 'monitoring'
+      password_file: /etc/prometheus/api_password.txt
+
+  # Health check monitoring
+  - job_name: 'micro-agent-health'
+    static_configs:
+      - targets: ['micro-agent-api:8000']
+    scrape_interval: 30s
+    metrics_path: /api/v1/health
+    params:
+      format: ['prometheus']
+
+  # Redis monitoring (if enabled)
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+# Storage configuration
+storage:
+  tsdb:
+    path: /prometheus
+    retention.time: 30d
+    retention.size: 10GB
+
+# Remote write configuration for long-term storage (optional)
+# remote_write:
+#   - url: "https://your-remote-prometheus-endpoint/api/v1/write"
+#     basic_auth:
+#       username: "username"
+#       password: "password"
+
+# Web configuration
+web:
+  enable_lifecycle: true
+  enable_admin_api: true
+  max_connections: 512
+  read_timeout: 30s

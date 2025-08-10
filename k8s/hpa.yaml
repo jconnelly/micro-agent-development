@@ -1,0 +1,123 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: micro-agent-api-hpa
+  namespace: micro-agent-platform
+  labels:
+    app.kubernetes.io/name: micro-agent-api
+    app.kubernetes.io/component: autoscaling
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/part-of: micro-agent-platform
+  annotations:
+    description: "Horizontal Pod Autoscaler for Micro-Agent API with CPU, memory, and custom metrics"
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: micro-agent-api
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+    # CPU-based scaling
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    # Memory-based scaling
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+    # Custom metrics (requires metrics server and custom metrics API)
+    - type: Pods
+      pods:
+        metric:
+          name: http_requests_per_second
+        target:
+          type: AverageValue
+          averageValue: "100"  # 100 requests per second per pod
+    # External metrics (if using external monitoring system)
+    - type: External
+      external:
+        metric:
+          name: pubsub.googleapis.com|subscription|num_undelivered_messages
+          selector:
+            matchLabels:
+              resource.labels.subscription_id: "micro-agent-tasks"
+        target:
+          type: AverageValue
+          averageValue: "30"
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300  # 5 minutes
+      policies:
+        - type: Percent
+          value: 50  # Scale down by max 50% of current replicas
+          periodSeconds: 60
+        - type: Pods
+          value: 2  # Scale down by max 2 pods
+          periodSeconds: 60
+      selectPolicy: Min  # Use the policy that results in fewer pods being removed
+    scaleUp:
+      stabilizationWindowSeconds: 60  # 1 minute
+      policies:
+        - type: Percent
+          value: 100  # Scale up by max 100% of current replicas
+          periodSeconds: 60
+        - type: Pods
+          value: 4  # Scale up by max 4 pods
+          periodSeconds: 60
+      selectPolicy: Max  # Use the policy that results in more pods being added
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: micro-agent-redis-hpa
+  namespace: micro-agent-platform
+  labels:
+    app.kubernetes.io/name: micro-agent-redis
+    app.kubernetes.io/component: autoscaling
+    app.kubernetes.io/version: "7.0"
+    app.kubernetes.io/part-of: micro-agent-platform
+  annotations:
+    description: "HPA for Redis cache - conservative scaling due to state"
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: micro-agent-redis
+  minReplicas: 1
+  maxReplicas: 3  # Conservative scaling for Redis
+  metrics:
+    # CPU-based scaling
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 80
+    # Memory-based scaling
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 85
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 600  # 10 minutes - longer for stateful services
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 300  # Scale down by 1 pod every 5 minutes max
+    scaleUp:
+      stabilizationWindowSeconds: 180  # 3 minutes
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 180  # Scale up by 1 pod every 3 minutes max

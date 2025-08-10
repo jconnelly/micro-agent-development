@@ -1,0 +1,102 @@
+# Dockerfile optimized for Google Cloud Run deployment
+# Focused on fast cold starts and serverless execution
+
+# =============================================================================
+# Stage 1: Base Python Environment (Optimized for Cloud Run)
+# =============================================================================
+FROM python:3.11-slim as base
+
+# Cloud Run optimizations
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    # Reduce startup time
+    PYTHONPATH=/app \
+    # Cloud Run specific
+    PORT=8080
+
+# Install only essential system dependencies for faster builds
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Create non-root user (Cloud Run security requirement)
+RUN groupadd --gid 1000 appuser && \
+    useradd --uid 1000 --gid appuser --shell /bin/bash --create-home appuser
+
+# =============================================================================
+# Stage 2: Dependencies Installation (Cached Layer)
+# =============================================================================
+FROM base as dependencies
+
+WORKDIR /app
+
+# Copy and install Python dependencies first (for Docker layer caching)
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Install Gunicorn for production serving
+RUN pip install --no-cache-dir gunicorn==21.2.0
+
+# =============================================================================
+# Stage 3: Application Layer (Cloud Run Optimized)
+# =============================================================================
+FROM dependencies as production
+
+# Cloud Run environment variables
+ENV FLASK_ENV=production \
+    FLASK_DEBUG=0 \
+    # Single worker for Cloud Run (horizontal scaling instead)
+    WORKERS=1 \
+    TIMEOUT=300 \
+    KEEP_ALIVE=2 \
+    # Optimized for serverless
+    MAX_REQUESTS=1000 \
+    MAX_REQUESTS_JITTER=100 \
+    # Preload application for faster response times
+    PRELOAD=true
+
+# Create application directories with proper permissions
+RUN mkdir -p /app/logs /app/tmp && \
+    chown -R appuser:appuser /app
+
+# Copy application code (use .dockerignore to minimize context)
+COPY --chown=appuser:appuser . /app/
+
+# Set working directory
+WORKDIR /app
+
+# Switch to non-root user (required by Cloud Run)
+USER appuser
+
+# Cloud Run expects the container to listen on PORT environment variable
+EXPOSE $PORT
+
+# Health check optimized for Cloud Run
+HEALTHCHECK --interval=60s --timeout=10s --start-period=10s --retries=2 \
+  CMD curl -f http://localhost:$PORT/api/v1/health || exit 1
+
+# Production command optimized for Cloud Run
+# Using PORT environment variable that Cloud Run sets
+CMD exec gunicorn \
+    --bind 0.0.0.0:$PORT \
+    --workers 1 \
+    --worker-class sync \
+    --timeout 300 \
+    --keep-alive 2 \
+    --max-requests 1000 \
+    --max-requests-jitter 100 \
+    --preload \
+    --access-logfile - \
+    --error-logfile - \
+    --log-level info \
+    --capture-output \
+    --enable-stdio-inheritance \
+    app:app
+
+# Alternative: Using Cloud Run's automatic scaling, you might prefer:
+# CMD ["python", "app.py"] 
+# if app.py is configured to use Flask's built-in server with proper threading
