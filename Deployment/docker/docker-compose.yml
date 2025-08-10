@@ -9,8 +9,8 @@ services:
   # =============================================================================
   micro-agent-api:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: Deployment/docker/Dockerfile
       target: production
     container_name: micro-agent-api
     restart: unless-stopped
@@ -44,7 +44,7 @@ services:
       # Logs volume for persistent logging
       - micro-agent-logs:/app/logs
       # Configuration volume (optional)
-      - ./config:/app/config:ro
+      - ../../config:/app/config:ro
     networks:
       - micro-agent-network
     healthcheck:
@@ -92,7 +92,7 @@ services:
     ports:
       - "${PROMETHEUS_PORT:-9090}:9090"
     volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - micro-agent-prometheus-data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -119,7 +119,7 @@ services:
       - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
       - micro-agent-grafana-data:/var/lib/grafana
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
     networks:
       - micro-agent-network
     profiles:

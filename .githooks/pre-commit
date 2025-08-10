@@ -146,6 +146,15 @@ if [ "$changelog_updated" = true ]; then
     fi
     
     print_success "CHANGELOG.md format validation passed"
+    
+    # Auto-sync docs/about/changelog.md
+    print_info "Synchronizing docs/about/changelog.md..."
+    if [ -f "scripts/sync-changelog.sh" ]; then
+        bash scripts/sync-changelog.sh --git-add
+        print_success "Docs changelog synchronized and staged"
+    else
+        print_warning "Changelog sync script not found, manual sync may be needed"
+    fi
 fi
 
 # Success message

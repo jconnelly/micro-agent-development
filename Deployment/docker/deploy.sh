@@ -14,9 +14,10 @@ NC='\033[0m' # No Color
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 PROJECT_NAME="micro-agent-platform"
 DOCKER_COMPOSE_FILE="docker-compose.yml"
-ENV_FILE=".env"
+ENV_FILE="$PROJECT_ROOT/.env"
 
 # Functions
 print_status() {

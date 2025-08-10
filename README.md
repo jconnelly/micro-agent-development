@@ -24,10 +24,10 @@ cp .env.example .env
 # Edit .env with your API keys and settings
 
 # Deploy production environment
-./deploy.sh prod
+cd Deployment/docker && ./deploy.sh prod
 
-# Or deploy development environment with hot reloading
-./deploy.sh dev
+# Or deploy development environment with hot reloading  
+cd Deployment/docker && ./deploy.sh dev
 ```
 
 **✅ Ready!** API available at http://localhost:8000 (prod) or http://localhost:5000 (dev)
@@ -180,8 +180,8 @@ RATE_LIMIT_PER_MINUTE=60
 
 ### **Docker Configuration**
 
-- **Production**: `docker-compose.yml` - Optimized for production with security hardening
-- **Development**: `docker-compose.dev.yml` - Hot reloading and debugging support  
+- **Production**: `Deployment/docker/docker-compose.yml` - Optimized for production with security hardening
+- **Development**: `Deployment/docker/docker-compose.dev.yml` - Hot reloading and debugging support  
 - **Monitoring**: `--profile monitoring` - Adds Prometheus, Grafana, and Redis
 
 ---

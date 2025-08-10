@@ -12,7 +12,8 @@
       "Bash(git push:*)",
       "Bash(pip install:*)",
       "Bash(set FLASK_ENV=development)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(./scripts/sync-changelog.sh:*)"
     ],
     "deny": []
   }

@@ -9,8 +9,8 @@ services:
   # =============================================================================
   micro-agent-api-dev:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: Deployment/docker/Dockerfile
       target: development
     container_name: micro-agent-api-dev
     restart: unless-stopped
@@ -38,8 +38,8 @@ services:
       - AUDIT_LOG_LEVEL=1
       - PYTHONPATH=/app
     volumes:
-      # Mount source code for hot reloading
-      - .:/app
+      # Mount source code for hot reloading - from project root
+      - ../..:/app
       - /app/__pycache__
       - /app/.git
     networks:
@@ -60,8 +60,8 @@ services:
   # =============================================================================
   docs-server:
     build:
-      context: .
-      dockerfile: Dockerfile.docs
+      context: ../..
+      dockerfile: Deployment/docker/Dockerfile.docs
       target: docs-development
     container_name: micro-agent-docs-dev
     restart: unless-stopped
