@@ -1,0 +1,211 @@
+name: Documentation Check
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - '**/*.py'
+      - '**/*.js' 
+      - '**/*.ts'
+      - '**/Dockerfile*'
+      - '**/docker-compose*.yml'
+      - 'k8s/**/*.yaml'
+      - 'cloud-run/**/*.yaml'
+      - '**/*.json'
+      - '**/*.toml'
+      - 'requirements*.txt'
+  
+  push:
+    branches: [ main ]
+    paths:
+      - '**/*.py'
+      - '**/*.js'
+      - '**/*.ts' 
+      - '**/Dockerfile*'
+      - '**/docker-compose*.yml'
+      - 'k8s/**/*.yaml'
+      - 'cloud-run/**/*.yaml'
+
+jobs:
+  check-documentation:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch full history for better diff analysis
+    
+    - name: Get changed files
+      id: changed-files
+      uses: tj-actions/changed-files@v40
+      with:
+        files: |
+          **/*.py
+          **/*.js
+          **/*.ts
+          **/Dockerfile*
+          **/docker-compose*.yml
+          k8s/**/*.yaml
+          cloud-run/**/*.yaml
+          **/*.json
+          **/*.toml
+          requirements*.txt
+    
+    - name: Check documentation updates
+      id: doc-check
+      if: steps.changed-files.outputs.any_changed == 'true'
+      run: |
+        echo "::group::Checking documentation updates"
+        
+        # Check if CHANGELOG.md was modified
+        if git diff --name-only ${{ github.event.before }}..${{ github.sha }} | grep -q "CHANGELOG.md"; then
+          echo "changelog_updated=true" >> $GITHUB_OUTPUT
+          echo "✅ CHANGELOG.md was updated"
+        else
+          echo "changelog_updated=false" >> $GITHUB_OUTPUT
+          echo "❌ CHANGELOG.md was NOT updated"
+        fi
+        
+        # Check if CLAUDE.md was modified - NOW REQUIRED FOR ALL CHANGES
+        if git diff --name-only ${{ github.event.before }}..${{ github.sha }} | grep -q "CLAUDE.md"; then
+          echo "claude_md_updated=true" >> $GITHUB_OUTPUT
+          echo "✅ CLAUDE.md was updated"
+        else
+          echo "claude_md_updated=false" >> $GITHUB_OUTPUT
+          echo "❌ CLAUDE.md was NOT updated"
+        fi
+        
+        # Count lines changed in code files
+        lines_changed=$(git diff --numstat ${{ github.event.before }}..${{ github.sha }} -- '*.py' '*.js' '*.ts' 'Dockerfile*' 'docker-compose*.yml' 'k8s/*.yaml' | awk '{added+=$1; deleted+=$2} END {print added+deleted}')
+        echo "lines_changed=${lines_changed:-0}" >> $GITHUB_OUTPUT
+        echo "📊 Lines changed in code files: ${lines_changed:-0}"
+        
+        echo "::endgroup::"
+    
+    - name: Validate documentation requirements
+      if: steps.changed-files.outputs.any_changed == 'true'
+      run: |
+        lines_changed="${{ steps.doc-check.outputs.lines_changed }}"
+        changelog_updated="${{ steps.doc-check.outputs.changelog_updated }}"
+        claude_md_updated="${{ steps.doc-check.outputs.claude_md_updated }}"
+        
+        echo "::group::Documentation Requirements Check"
+        echo "Lines changed: $lines_changed"
+        echo "CHANGELOG.md updated: $changelog_updated"
+        echo "CLAUDE.md updated: $claude_md_updated"
+        
+        # CLAUDE.md is ALWAYS REQUIRED for any code changes
+        if [ "$claude_md_updated" = "false" ]; then
+          echo "::error::Code changes detected but CLAUDE.md was not updated."
+          echo "::error::CLAUDE.md must be updated for ALL code changes to track project progress."
+          echo "::notice::Required CLAUDE.md updates:"
+          echo "::notice::- Add entry documenting what was changed and why"
+          echo "::notice::- Update relevant phase status or progress tracking"
+          echo "::notice::- Include technical implementation details"
+          echo "::notice::- Note any impact on system behavior or performance"
+          exit 1
+        else
+          echo "✅ CLAUDE.md was updated as required"
+        fi
+        
+        # For major changes (>50 lines), also require CHANGELOG.md update
+        if [ "$lines_changed" -gt 50 ]; then
+          if [ "$changelog_updated" = "false" ]; then
+            echo "::error::Major changes detected ($lines_changed lines) but CHANGELOG.md was not updated."
+            echo "::error::Please update CHANGELOG.md with user-facing details about your changes."
+            echo "::notice::Add an entry under the [Unreleased] section describing:"
+            echo "::notice::- What was added, changed, or fixed"
+            echo "::notice::- Impact on users or system behavior"
+            echo "::notice::- Any breaking changes or migration notes"
+            exit 1
+          else
+            echo "✅ Major changes detected and both CLAUDE.md and CHANGELOG.md were updated"
+          fi
+        elif [ "$lines_changed" -gt 10 ]; then
+          if [ "$changelog_updated" = "false" ]; then
+            echo "::warning::Moderate changes detected ($lines_changed lines) but CHANGELOG.md was not updated."
+            echo "::notice::Consider adding a changelog entry for user-facing changes."
+          else
+            echo "✅ Moderate changes detected and both CLAUDE.md and CHANGELOG.md were updated"
+          fi
+        else
+          echo "✅ Minor changes detected, CLAUDE.md requirement satisfied"
+        fi
+        
+        echo "::endgroup::"
+    
+    - name: Validate CHANGELOG.md format
+      if: steps.doc-check.outputs.changelog_updated == 'true'
+      run: |
+        echo "::group::CHANGELOG.md Format Validation"
+        
+        # Check basic format requirements
+        if ! grep -q "# Changelog" CHANGELOG.md; then
+          echo "::error::CHANGELOG.md must contain '# Changelog' header"
+          exit 1
+        fi
+        
+        if ! grep -q "## \[Unreleased\]" CHANGELOG.md; then
+          echo "::error::CHANGELOG.md must contain '## [Unreleased]' section"
+          exit 1
+        fi
+        
+        # Check for proper semantic versioning format
+        if ! grep -qE "## \[[0-9]+\.[0-9]+\.[0-9]+\]" CHANGELOG.md; then
+          echo "::warning::Consider adding properly versioned releases (e.g., ## [1.0.0])"
+        fi
+        
+        # Check for required sections
+        if grep -A 20 "## \[Unreleased\]" CHANGELOG.md | grep -q "### Added\|### Changed\|### Fixed\|### Removed"; then
+          echo "✅ CHANGELOG.md contains proper sections (Added/Changed/Fixed/Removed)"
+        else
+          echo "::warning::Consider organizing changes under ### Added, ### Changed, ### Fixed, or ### Removed sections"
+        fi
+        
+        echo "✅ CHANGELOG.md format validation passed"
+        echo "::endgroup::"
+    
+    - name: Check for documentation completeness
+      if: steps.changed-files.outputs.any_changed == 'true'
+      run: |
+        echo "::group::Documentation Completeness Check"
+        
+        # Check if new Python files have docstrings
+        new_py_files=$(git diff --name-only --diff-filter=A ${{ github.event.before }}..${{ github.sha }} -- '*.py' || true)
+        if [ -n "$new_py_files" ]; then
+          echo "Checking new Python files for docstrings:"
+          missing_docstrings=""
+          for file in $new_py_files; do
+            if [ -f "$file" ]; then
+              if ! head -20 "$file" | grep -q '"""'; then
+                missing_docstrings="$missing_docstrings $file"
+              fi
+            fi
+          done
+          
+          if [ -n "$missing_docstrings" ]; then
+            echo "::warning::New Python files without docstrings:$missing_docstrings"
+            echo "::notice::Consider adding docstrings to improve code documentation"
+          else
+            echo "✅ All new Python files have docstrings"
+          fi
+        fi
+        
+        # Check if README.md needs updating for major changes
+        lines_changed="${{ steps.changelog-check.outputs.lines_changed }}"
+        if [ "$lines_changed" -gt 200 ]; then
+          if ! git diff --name-only ${{ github.event.before }}..${{ github.sha }} | grep -q "README.md"; then
+            echo "::notice::Very large changes detected ($lines_changed lines)"
+            echo "::notice::Consider updating README.md if this adds new features or changes usage"
+          fi
+        fi
+        
+        echo "::endgroup::"
+    
+    - name: Summary
+      if: steps.changed-files.outputs.any_changed == 'true'
+      run: |
+        echo "::notice title=Documentation Check Complete::✅ All documentation requirements have been validated"
+        echo "📝 Lines changed: ${{ steps.doc-check.outputs.lines_changed }}"
+        echo "📋 CHANGELOG.md updated: ${{ steps.doc-check.outputs.changelog_updated }}"
+        echo "📖 CLAUDE.md updated: ${{ steps.doc-check.outputs.claude_md_updated }}"

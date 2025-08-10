@@ -1,0 +1,160 @@
+#!/bin/bash
+
+# Pre-commit hook to enforce documentation updates
+# This hook ensures CHANGELOG.md is updated when code changes are committed
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+print_error() {
+    echo -e "${RED}[COMMIT BLOCKED]${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+print_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+print_info() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+# Check if this is an initial commit
+if git rev-parse --verify HEAD >/dev/null 2>&1; then
+    against=HEAD
+else
+    # Initial commit: diff against an empty tree object
+    against=$(git hash-object -t tree /dev/null)
+fi
+
+# Get list of staged files
+staged_files=$(git diff --cached --name-only --diff-filter=ACM)
+
+# Check if any code files are being committed
+code_files=$(echo "$staged_files" | grep -E '\.(py|js|ts|java|cpp|c|rb|go|php|rs|kt|swift)$' || true)
+config_files=$(echo "$staged_files" | grep -E '\.(yaml|yml|json|toml|ini|conf|config)$' || true)
+docker_files=$(echo "$staged_files" | grep -E '(Dockerfile|docker-compose|\.dockerignore)' || true)
+k8s_files=$(echo "$staged_files" | grep -E 'k8s/.*\.yaml$' || true)
+
+# Check if significant changes are being made
+significant_changes=false
+
+if [ -n "$code_files" ] || [ -n "$config_files" ] || [ -n "$docker_files" ] || [ -n "$k8s_files" ]; then
+    significant_changes=true
+fi
+
+# Skip documentation checks for certain types of commits
+commit_msg_file=".git/COMMIT_EDITMSG"
+if [ -f "$commit_msg_file" ]; then
+    commit_msg=$(cat "$commit_msg_file" 2>/dev/null || echo "")
+    
+    # Skip checks for documentation-only commits or minor updates
+    if echo "$commit_msg" | grep -qiE "(^docs?:|^documentation:|^readme:|^changelog:|^update docs|^fix typo|^minor update)"; then
+        print_info "Documentation-only commit detected, skipping changelog requirement."
+        exit 0
+    fi
+fi
+
+if [ "$significant_changes" = true ]; then
+    print_info "Code changes detected. Checking documentation requirements..."
+    
+    # Check if CHANGELOG.md has been updated
+    changelog_updated=false
+    if echo "$staged_files" | grep -q "CHANGELOG.md"; then
+        changelog_updated=true
+    fi
+    
+    # Check if CLAUDE.md has been updated - NOW REQUIRED FOR ALL CHANGES
+    claude_md_updated=false
+    if echo "$staged_files" | grep -q "CLAUDE.md"; then
+        claude_md_updated=true
+    fi
+    
+    # Get the size of changes
+    lines_changed=$(git diff --cached --numstat | awk '{added+=$1; deleted+=$2} END {print added+deleted}')
+    
+    # CLAUDE.md is ALWAYS REQUIRED for any significant changes
+    if [ "$claude_md_updated" = false ]; then
+        print_error "Code changes detected, but CLAUDE.md was not updated."
+        print_error "CLAUDE.md must be updated for ALL code changes to track project progress."
+        print_info ""
+        print_info "Required CLAUDE.md updates:"
+        echo "  • Add entry documenting what was changed and why"
+        echo "  • Update relevant phase status or progress tracking"
+        echo "  • Include technical implementation details"
+        echo "  • Note any impact on system behavior or performance"
+        echo ""
+        print_info "You can also use: git commit -m 'your message' --no-verify to skip this check"
+        exit 1
+    fi
+    
+    # For major changes (>50 lines), also require CHANGELOG.md
+    if [ "$lines_changed" -gt 50 ]; then
+        if [ "$changelog_updated" = false ]; then
+            print_error "Major changes detected ($lines_changed lines), but CHANGELOG.md was not updated."
+            print_error "Please update CHANGELOG.md with user-facing details about your changes."
+            print_info "Suggested changelog entry format:"
+            echo "  ### Added/Changed/Fixed"
+            echo "  - Brief description of your changes"
+            echo "  - Impact on users or system behavior"
+            echo ""
+            print_info "You can also use: git commit -m 'your message' --no-verify to skip this check"
+            exit 1
+        fi
+    fi
+    
+    # For smaller changes (10-50 lines), warn about changelog but CLAUDE.md is still required
+    if [ "$lines_changed" -gt 10 ] && [ "$lines_changed" -le 50 ] && [ "$changelog_updated" = false ]; then
+        print_warning "Moderate changes detected ($lines_changed lines), but CHANGELOG.md was not updated."
+        print_warning "Consider adding a changelog entry for user-facing changes."
+        print_info "Continue anyway? (y/N)"
+        read -r response
+        case "$response" in
+            [yY][eE][sS]|[yY]) 
+                print_info "Continuing with commit (CLAUDE.md requirement already satisfied)..."
+                ;;
+            *) 
+                print_error "Commit cancelled. Please update CHANGELOG.md or use --no-verify to skip."
+                exit 1
+                ;;
+        esac
+    fi
+fi
+
+# Validate CHANGELOG.md format if it's being updated
+if [ "$changelog_updated" = true ]; then
+    print_info "Validating CHANGELOG.md format..."
+    
+    # Check basic format requirements
+    if ! grep -q "# Changelog" CHANGELOG.md; then
+        print_error "CHANGELOG.md must contain '# Changelog' header"
+        exit 1
+    fi
+    
+    if ! grep -q "## \[Unreleased\]" CHANGELOG.md; then
+        print_error "CHANGELOG.md must contain '## [Unreleased]' section"
+        exit 1
+    fi
+    
+    print_success "CHANGELOG.md format validation passed"
+fi
+
+# Success message
+if [ "$significant_changes" = true ]; then
+    if [ "$changelog_updated" = true ]; then
+        print_success "Documentation requirements satisfied. Proceeding with commit."
+    else
+        print_success "Minor changes detected. Proceeding with commit."
+    fi
+fi
+
+exit 0

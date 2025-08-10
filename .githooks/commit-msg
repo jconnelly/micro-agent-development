@@ -1,0 +1,76 @@
+#!/bin/bash
+
+# Commit message hook to enforce commit message standards
+# This hook validates commit messages follow conventional commit format
+
+commit_msg_file="$1"
+commit_msg=$(cat "$commit_msg_file")
+
+# Colors for output
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+GREEN='\033[0;32m'
+NC='\033[0m' # No Color
+
+print_error() {
+    echo -e "${RED}[COMMIT BLOCKED]${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+print_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+# Skip validation for merge commits
+if echo "$commit_msg" | grep -q "^Merge "; then
+    exit 0
+fi
+
+# Skip validation for revert commits
+if echo "$commit_msg" | grep -q "^Revert "; then
+    exit 0
+fi
+
+# Check minimum length
+if [ ${#commit_msg} -lt 10 ]; then
+    print_error "Commit message too short. Minimum 10 characters required."
+    print_error "Current length: ${#commit_msg}"
+    exit 1
+fi
+
+# Check maximum length for first line
+first_line=$(echo "$commit_msg" | head -n1)
+if [ ${#first_line} -gt 72 ]; then
+    print_warning "First line is longer than 72 characters (${#first_line})."
+    print_warning "Consider shortening for better git log readability."
+fi
+
+# Validate conventional commit format (optional but recommended)
+conventional_pattern="^(feat|fix|docs|style|refactor|test|chore|perf|ci|build|phase[0-9]+)(\(.+\))?: .+"
+
+if ! echo "$first_line" | grep -qE "$conventional_pattern"; then
+    print_warning "Commit message doesn't follow conventional commit format."
+    print_warning "Recommended format: type(scope): description"
+    print_warning "Types: feat, fix, docs, style, refactor, test, chore, perf, ci, build, phase[N]"
+    print_warning "Example: feat(api): add user authentication endpoint"
+    print_warning "Example: phase12: complete Kubernetes deployment infrastructure"
+fi
+
+# Check for common issues
+if echo "$commit_msg" | grep -qE "^(wip|WIP|temp|TODO|FIXME)"; then
+    print_error "Commit message appears to be work-in-progress or temporary."
+    print_error "Please provide a proper commit message describing the changes."
+    exit 1
+fi
+
+# Check for trailing whitespace
+if echo "$commit_msg" | grep -q " $"; then
+    print_warning "Commit message contains trailing whitespace."
+fi
+
+# Success
+print_success "Commit message validation passed."
+exit 0
