@@ -28,9 +28,8 @@ from .StandardImports import (
 from .RuleDocumentationGeneratorAgent import RuleDocumentationGeneratorAgent
 from .ComplianceMonitoringAgent import ComplianceMonitoringAgent, AuditLevel
 
-# Import Utils using standardized import utility
-utils = ImportUtils.import_utils('TimeUtils')
-TimeUtils = utils['TimeUtils']
+# Import Utils directly from Utils module
+from Utils.time_utils import TimeUtils
 
 
 class AdvancedDocumentationAgent(RuleDocumentationGeneratorAgent):

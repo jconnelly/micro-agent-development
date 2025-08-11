@@ -28,10 +28,9 @@ from .StandardImports import (
 from .PersonalDataProtectionAgent import PersonalDataProtectionAgent, PIIType, MaskingStrategy, PIIContext
 from .ComplianceMonitoringAgent import AuditLevel
 
-# Import Utils using standardized import utility
-utils = ImportUtils.import_utils('TimeUtils', 'TextProcessingUtils')
-TimeUtils = utils['TimeUtils']
-TextProcessingUtils = utils['TextProcessingUtils']
+# Import Utils directly from Utils module
+from Utils.time_utils import TimeUtils
+from Utils.text_processing import TextProcessingUtils
 
 
 class EnterpriseDataPrivacyAgent(PersonalDataProtectionAgent):

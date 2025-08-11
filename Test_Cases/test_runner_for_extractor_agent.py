@@ -13,7 +13,7 @@ if project_root not in sys.path:
 
 # Import the classes from their respective files
 from Agents.ComplianceMonitoringAgent import ComplianceMonitoringAgent, AuditLevel
-from Agents.BusinessRuleExtractionAgent import BusinessRuleExtractorAgent
+from Agents.BusinessRuleExtractionAgent import BusinessRuleExtractionAgent
 
 # Import the Google Generative AI library
 import google.generativeai as genai
@@ -68,7 +68,7 @@ def main():
         return
 
     # --- Step 4: Initialize LegacyRuleExtractionAgent ---
-    rule_extractor_agent = BusinessRuleExtractorAgent(
+    rule_extractor_agent = BusinessRuleExtractionAgent(
         llm_client=real_llm_client, # Pass the real client
         audit_system=audit_system,
         log_level=1,  # Enable logging for development/testing
