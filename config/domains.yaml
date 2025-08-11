@@ -109,6 +109,46 @@ domains:
       - "discount"
       - "catalog"
 
+# Classification settings
+classification:
+  # Minimum confidence threshold for domain classification
+  min_confidence_threshold: 20.0
+  
+  # Multi-domain threshold - domains above this percentage are considered significant
+  multi_domain_threshold: 20.0
+  
+  # Maximum number of detected keywords to return
+  max_detected_keywords: 10
+  
+  # Default domain when no keywords match
+  default_domain: "general"
+  
+  # Case sensitivity for keyword matching
+  case_sensitive: false
+
+# Environment-specific overrides (optional)
+environments:
+  development:
+    classification:
+      min_confidence_threshold: 10.0  # Lower threshold for testing
+      
+  production:
+    classification:
+      min_confidence_threshold: 25.0  # Higher threshold for production accuracy
+      
+  staging:
+    classification:
+      min_confidence_threshold: 20.0  # Standard threshold for staging
+
+# Extensibility support
+custom_domains:
+  # Users can add custom domains here without modifying core configuration
+  # Example:
+  # retail:
+  #   description: "Retail operations and inventory management"
+  #   keywords: ["inventory", "pos", "cashier", "sale"]
+  #   weight: 1.0
+
 # Configuration metadata
 metadata:
   version: "1.0.0"
@@ -116,3 +156,6 @@ metadata:
   total_domains: 6
   total_keywords: 78
   description: "Domain classification keywords for automatic business rule categorization"
+  supports_multi_word: true
+  supports_weighting: true
+  supports_environment_overrides: true
