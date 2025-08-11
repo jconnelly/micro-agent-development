@@ -19,9 +19,11 @@ Author: AI Development Team
 Version: 1.0.0
 """
 
+import hashlib
+import datetime
 from .StandardImports import (
     # Standard library imports
-    re, json, uuid, hashlib,
+    re, json, uuid,
     
     # Type annotations
     Dict, List, Any, Optional, Tuple, Union, Pattern,
@@ -35,6 +37,7 @@ from .StandardImports import (
 from enum import Enum
 import secrets
 import string
+import base64
 from functools import lru_cache
 
 # Import other Agents from current location, change package location if moved
@@ -42,11 +45,176 @@ from .BaseAgent import BaseAgent
 from .ComplianceMonitoringAgent import ComplianceMonitoringAgent
 from .Exceptions import PIIProcessingError, ConfigurationError, ValidationError
 
-# Import Utils using standardized import utility
-utils = ImportUtils.import_utils('JsonUtils', 'TextProcessingUtils', 'config_loader')
-JsonUtils = utils['JsonUtils']
-TextProcessingUtils = utils['TextProcessingUtils']
-config_loader = utils['config_loader']
+# Import Utils directly from Utils module
+from Utils.json_utils import JsonUtils
+from Utils.text_processing import TextProcessingUtils
+from Utils.config_loader import load_config as config_loader
+
+
+class SecureTokenStorage:
+    """
+    Secure token storage for PII tokenization with encryption and expiry.
+    Replaces insecure in-memory dictionary storage.
+    """
+    
+    def __init__(self, storage_key: Optional[str] = None):
+        """
+        Initialize secure token storage with encryption.
+        
+        Args:
+            storage_key: Base64-encoded encryption key. If None, generates a new key.
+        """
+        if storage_key:
+            self.key = storage_key.encode('utf-8')
+        else:
+            # In production, this key should come from secure key management (e.g., AWS KMS, HashiCorp Vault)
+            self.key = base64.urlsafe_b64encode(secrets.token_bytes(32))
+        
+        # Initialize encryption with the key
+        try:
+            # Use a simple XOR-based encryption for now (production should use proper crypto library)
+            self._encryption_key = hashlib.sha256(self.key).digest()
+        except Exception:
+            # Fallback to basic key derivation
+            self._encryption_key = hashlib.md5(self.key).digest()
+        
+        # In-memory storage with expiry (production should use Redis/database)
+        self._token_store: Dict[str, Dict[str, Any]] = {}
+        self._reverse_mapping: Dict[str, str] = {}
+    
+    def _encrypt_value(self, value: str) -> str:
+        """Encrypt a value using simple XOR encryption."""
+        # Convert value to bytes
+        value_bytes = value.encode('utf-8')
+        
+        # Simple XOR encryption (production should use AES/Fernet)
+        encrypted = bytearray()
+        key_len = len(self._encryption_key)
+        
+        for i, byte in enumerate(value_bytes):
+            encrypted.append(byte ^ self._encryption_key[i % key_len])
+        
+        # Return base64 encoded result
+        return base64.b64encode(bytes(encrypted)).decode('utf-8')
+    
+    def _decrypt_value(self, encrypted_value: str) -> str:
+        """Decrypt a value using simple XOR decryption."""
+        try:
+            # Decode from base64
+            encrypted_bytes = base64.b64decode(encrypted_value.encode('utf-8'))
+            
+            # Simple XOR decryption
+            decrypted = bytearray()
+            key_len = len(self._encryption_key)
+            
+            for i, byte in enumerate(encrypted_bytes):
+                decrypted.append(byte ^ self._encryption_key[i % key_len])
+            
+            return bytes(decrypted).decode('utf-8')
+        except Exception:
+            # If decryption fails, return empty string for security
+            return ""
+    
+    def store_token(self, token: str, original_value: str, ttl_hours: int = 24) -> bool:
+        """
+        Store a token mapping securely with expiry.
+        
+        Args:
+            token: The token to store
+            original_value: The original PII value to encrypt
+            ttl_hours: Time to live in hours
+            
+        Returns:
+            True if stored successfully
+        """
+        try:
+            # Encrypt the original value
+            encrypted_value = self._encrypt_value(original_value)
+            
+            # Calculate expiry time
+            expiry_time = dt.now(timezone.utc) + dt.timedelta(hours=ttl_hours)
+            
+            # Store encrypted mapping
+            self._token_store[token] = {
+                'encrypted_value': encrypted_value,
+                'expires_at': expiry_time,
+                'created_at': dt.now(timezone.utc)
+            }
+            
+            # Store reverse mapping for quick lookup
+            self._reverse_mapping[original_value] = token
+            
+            return True
+        except Exception:
+            return False
+    
+    def retrieve_original(self, token: str) -> Optional[str]:
+        """
+        Retrieve and decrypt the original value for a token.
+        
+        Args:
+            token: The token to look up
+            
+        Returns:
+            Decrypted original value or None if not found/expired
+        """
+        if token not in self._token_store:
+            return None
+        
+        token_data = self._token_store[token]
+        
+        # Check if token has expired
+        if dt.now(timezone.utc) > token_data['expires_at']:
+            # Remove expired token
+            self._cleanup_token(token)
+            return None
+        
+        # Decrypt and return the value
+        return self._decrypt_value(token_data['encrypted_value'])
+    
+    def get_token_for_value(self, original_value: str) -> Optional[str]:
+        """Get existing token for a value if it exists and hasn't expired."""
+        token = self._reverse_mapping.get(original_value)
+        if token and token in self._token_store:
+            # Check if still valid
+            if dt.now(timezone.utc) <= self._token_store[token]['expires_at']:
+                return token
+            else:
+                # Clean up expired token
+                self._cleanup_token(token)
+        return None
+    
+    def _cleanup_token(self, token: str) -> None:
+        """Remove token and its reverse mapping."""
+        if token in self._token_store:
+            # Find and remove reverse mapping
+            token_data = self._token_store[token]
+            original_value = self._decrypt_value(token_data['encrypted_value'])
+            if original_value in self._reverse_mapping:
+                del self._reverse_mapping[original_value]
+            
+            # Remove token
+            del self._token_store[token]
+    
+    def cleanup_expired_tokens(self) -> int:
+        """Clean up all expired tokens. Returns count of removed tokens."""
+        current_time = dt.now(timezone.utc)
+        expired_tokens = [
+            token for token, data in self._token_store.items()
+            if current_time > data['expires_at']
+        ]
+        
+        for token in expired_tokens:
+            self._cleanup_token(token)
+        
+        return len(expired_tokens)
+    
+    def get_storage_stats(self) -> Dict[str, int]:
+        """Get storage statistics for monitoring."""
+        return {
+            'total_tokens': len(self._token_store),
+            'expired_tokens_cleaned': self.cleanup_expired_tokens()
+        }
 
 
 class PIIType(Enum):
@@ -189,8 +357,8 @@ class PersonalDataProtectionAgent(BaseAgent):
         self.context = context
         self.enable_tokenization = enable_tokenization
         
-        # Token storage for reversible operations (in production, this would be encrypted/external storage)
-        self.token_mapping: Dict[str, str] = {}
+        # Secure token storage for reversible operations with encryption and expiry
+        self.secure_token_storage = SecureTokenStorage()
         
         # Initialize PII detection patterns
         self._initialize_patterns()
@@ -890,9 +1058,18 @@ class PersonalDataProtectionAgent(BaseAgent):
         
         elif strategy == MaskingStrategy.TOKENIZE:
             if self.enable_tokenization:
+                # Check if we already have a token for this value
+                existing_token = self.secure_token_storage.get_token_for_value(value)
+                if existing_token:
+                    return existing_token
+                
+                # Create new token and store securely
                 token = f"PII_TOKEN_{uuid.uuid4().hex[:8].upper()}"
-                self.token_mapping[token] = value
-                return token
+                if self.secure_token_storage.store_token(token, value, ttl_hours=24):
+                    return token
+                else:
+                    # If secure storage fails, fall back to full masking for security
+                    return self._mask_value(value, pii_type, MaskingStrategy.FULL_MASK)
             else:
                 return self._mask_value(value, pii_type, MaskingStrategy.FULL_MASK)
         
@@ -932,14 +1109,24 @@ class PersonalDataProtectionAgent(BaseAgent):
         # Convert to string for processing
         text_data, is_dict_input = TextProcessingUtils.prepare_input_data(data)
         
-        # Find and replace tokens
+        # Find and replace tokens using secure storage
         restored_text = text_data
         tokens_found = []
         
-        for token, original_value in self.token_mapping.items():
-            if token in restored_text:
+        # Find all PII tokens in the text using regex
+        import re
+        token_pattern = r'PII_TOKEN_[A-Z0-9]{8}'
+        found_tokens = re.findall(token_pattern, restored_text)
+        
+        # Look up each token in secure storage and replace if found
+        for token in found_tokens:
+            original_value = self.secure_token_storage.retrieve_original(token)
+            if original_value:
                 restored_text = restored_text.replace(token, original_value)
                 tokens_found.append(token)
+        
+        # Clean up expired tokens periodically
+        self.secure_token_storage.cleanup_expired_tokens()
         
         # Convert back to original format
         restored_data = TextProcessingUtils.restore_data_format(restored_text, is_dict_input)

@@ -6,6 +6,7 @@ Provides structured logging with different levels and can be easily integrated w
 """
 
 import datetime
+import re
 from typing import Optional, Any, Dict
 
 
@@ -30,31 +31,60 @@ class AgentLogger:
         self.agent_name = agent_name
         self.session_logs = []  # Store logs in memory for audit trail
     
+    def _sanitize_message(self, message: str) -> str:
+        """
+        Sanitize log message to prevent injection attacks.
+        Removes control characters, escape sequences, and other potentially dangerous characters.
+        """
+        if not isinstance(message, str):
+            message = str(message)
+        
+        # Remove control characters (except newline and tab for readability)
+        message = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]', '', message)
+        
+        # Remove ANSI escape sequences (color codes, cursor movement, etc.)
+        message = re.sub(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', message)
+        
+        # Limit message length to prevent log flooding
+        max_length = 2000
+        if len(message) > max_length:
+            message = message[:max_length] + "... [TRUNCATED]"
+        
+        # Replace newlines with spaces to prevent log format confusion
+        message = message.replace('\n', ' ').replace('\r', ' ')
+        
+        return message
+    
     def _format_message(self, level: str, message: str, request_id: Optional[str] = None) -> str:
         """Format a log message with timestamp and metadata."""
+        # Sanitize the message to prevent injection attacks
+        clean_message = self._sanitize_message(message)
+        
         timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%H:%M:%S")
         prefix = f"[{timestamp}]"
         
         if request_id:
-            prefix += f"[{request_id}]"
+            # Also sanitize request_id to be safe
+            clean_request_id = self._sanitize_message(str(request_id)) if request_id else None
+            prefix += f"[{clean_request_id}]"
         
         prefix += f"[{self.agent_name}]"
         
         if level:
             prefix += f"[{level}]"
             
-        return f"{prefix} {message}"
+        return f"{prefix} {clean_message}"
     
     def info(self, message: str, request_id: Optional[str] = None, **kwargs) -> None:
         """Log an info message."""
         formatted_msg = self._format_message("INFO", message, request_id)
         
-        # Store in session logs for audit trail
+        # Store in session logs for audit trail (with sanitized message)
         log_entry = {
             "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "level": "INFO", 
-            "message": message,
-            "request_id": request_id,
+            "message": self._sanitize_message(message),
+            "request_id": self._sanitize_message(str(request_id)) if request_id else None,
             "metadata": kwargs
         }
         self.session_logs.append(log_entry)
@@ -70,8 +100,8 @@ class AgentLogger:
         log_entry = {
             "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "level": "WARNING",
-            "message": message,
-            "request_id": request_id,
+            "message": self._sanitize_message(message),
+            "request_id": self._sanitize_message(str(request_id)) if request_id else None,
             "metadata": kwargs
         }
         self.session_logs.append(log_entry)
@@ -86,9 +116,9 @@ class AgentLogger:
         log_entry = {
             "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "level": "ERROR",
-            "message": message,
-            "request_id": request_id,
-            "exception": str(exception) if exception else None,
+            "message": self._sanitize_message(message),
+            "request_id": self._sanitize_message(str(request_id)) if request_id else None,
+            "exception": self._sanitize_message(str(exception)) if exception else None,
             "exception_type": type(exception).__name__ if exception else None,
             "metadata": kwargs
         }
@@ -97,7 +127,8 @@ class AgentLogger:
         if self.log_level >= 1:
             print(formatted_msg)
             if exception:
-                print(f"  Exception: {exception}")
+                sanitized_exception = self._sanitize_message(str(exception))
+                print(f"  Exception: {sanitized_exception}")
     
     def progress(self, message: str, request_id: Optional[str] = None, **kwargs) -> None:
         """Log a progress message (always shown even in production for user feedback)."""
@@ -106,8 +137,8 @@ class AgentLogger:
         log_entry = {
             "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "level": "PROGRESS",
-            "message": message,
-            "request_id": request_id,
+            "message": self._sanitize_message(message),
+            "request_id": self._sanitize_message(str(request_id)) if request_id else None,
             "metadata": kwargs
         }
         self.session_logs.append(log_entry)
@@ -122,8 +153,8 @@ class AgentLogger:
         log_entry = {
             "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "level": "DEBUG",
-            "message": message,
-            "request_id": request_id,
+            "message": self._sanitize_message(message),
+            "request_id": self._sanitize_message(str(request_id)) if request_id else None,
             "metadata": kwargs
         }
         self.session_logs.append(log_entry)
