@@ -339,7 +339,10 @@ class EnterpriseDataPrivacyAgent(PersonalDataProtectionAgent):
                           masking_strategy: MaskingStrategy = MaskingStrategy.PARTIAL_MASK,
                           audit_level: int = AuditLevel.LEVEL_2.value) -> Dict[str, Any]:
         """
-        Scrub PII from file content using tool integration for improved performance.
+        Scrub PII from file content with automatic streaming for large files (>10MB).
+        
+        Phase 14 Memory Optimization: Automatically detects large files and uses 
+        streaming processing to prevent memory issues with enterprise-scale documents.
         
         Args:
             file_path: Path to file to process
@@ -356,7 +359,26 @@ class EnterpriseDataPrivacyAgent(PersonalDataProtectionAgent):
         self.logger.info(f"Starting file PII scrubbing: {file_path}", request_id=request_id)
         
         try:
-            # Read file using Read tool if available
+            # Check file size first to determine processing method
+            file_path_obj = Path(file_path)
+            file_stats = file_path_obj.stat()
+            file_size_mb = file_stats.st_size / (1024 * 1024)
+            
+            # Use streaming processing for large files (>10MB) to prevent memory issues
+            if file_size_mb > 10:
+                self.logger.info(f"Large file detected ({file_size_mb:.2f}MB). Using streaming processing to prevent memory issues.", request_id=request_id)
+                return self.scrub_large_file_streaming(
+                    file_path=file_path,
+                    context=context,
+                    masking_strategy=masking_strategy,
+                    audit_level=audit_level,
+                    chunk_size_mb=min(2, max(1, int(file_size_mb / 50)))  # Dynamic chunk size
+                )
+            
+            # For smaller files, use memory-efficient reading with size checking
+            self.logger.debug(f"Small file detected ({file_size_mb:.2f}MB). Using memory-optimized processing.", request_id=request_id)
+            
+            # Read file using Read tool if available, with memory monitoring
             if self.read_tool:
                 try:
                     file_content = self.read_tool(file_path=file_path)
@@ -364,26 +386,39 @@ class EnterpriseDataPrivacyAgent(PersonalDataProtectionAgent):
                     self.logger.debug(f"File read using Read tool: {len(file_content)} characters", request_id=request_id)
                 except Exception as e:
                     self.logger.warning(f"Read tool failed, using standard file I/O: {e}", request_id=request_id)
-                    # Fallback to standard file reading
+                    # Fallback to standard file reading with encoding handling
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            file_content = f.read()
+                        read_method = "standard_io_fallback_utf8"
+                    except UnicodeDecodeError:
+                        # Try alternative encodings for legacy files
+                        with open(file_path, 'r', encoding='latin1') as f:
+                            file_content = f.read()
+                        read_method = "standard_io_fallback_latin1"
+            else:
+                # Use standard file reading with robust encoding
+                try:
                     with open(file_path, 'r', encoding='utf-8') as f:
                         file_content = f.read()
-                    read_method = "standard_io_fallback"
-            else:
-                # Use standard file reading
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    file_content = f.read()
-                read_method = "standard_io"
+                    read_method = "standard_io_utf8"
+                except UnicodeDecodeError:
+                    # Handle legacy files with alternative encoding
+                    with open(file_path, 'r', encoding='latin1') as f:
+                        file_content = f.read()
+                    read_method = "standard_io_latin1"
             
-            # Get file metadata
-            file_path_obj = Path(file_path)
-            file_stats = file_path_obj.stat()
+            # Enhanced file metadata with memory optimization info
             file_metadata = {
                 'file_path': str(file_path_obj),
                 'file_name': file_path_obj.name,
                 'file_size_bytes': file_stats.st_size,
+                'file_size_mb': file_size_mb,
                 'content_length': len(file_content),
                 'read_method': read_method,
-                'file_extension': file_path_obj.suffix.lower()
+                'file_extension': file_path_obj.suffix.lower(),
+                'processing_method': 'memory_optimized_small_file',
+                'memory_efficient': True
             }
             
             # Determine processing method based on file size
@@ -596,7 +631,7 @@ class EnterpriseDataPrivacyAgent(PersonalDataProtectionAgent):
             Dictionary with streaming processing results and performance metrics
         """
         request_id = f"stream-pii-{uuid.uuid4().hex[:12]}"
-        start_time = dt.now(timezone.utc)
+        start_time = datetime.datetime.now(datetime.timezone.utc)
         
         file_path = Path(file_path)
         
@@ -614,18 +649,17 @@ class EnterpriseDataPrivacyAgent(PersonalDataProtectionAgent):
             # Define chunk processor function
             def process_pii_chunk(chunk_text: str, chunk_metadata: Dict[str, Any]) -> Dict[str, Any]:
                 """Process a single chunk for PII detection and masking."""
-                chunk_start = dt.now(timezone.utc)
+                chunk_start = datetime.datetime.now(datetime.timezone.utc)
                 
                 # Apply PII scrubbing to chunk
                 chunk_result = self.scrub_data(
                     data=chunk_text,
-                    context=context,
-                    masking_strategy=masking_strategy,
+                    custom_strategy=masking_strategy,
                     audit_level=audit_level,
                     request_id=f"{request_id}-chunk-{chunk_metadata['chunk_number']}"
                 )
                 
-                chunk_duration = (dt.now(timezone.utc) - chunk_start).total_seconds() * 1000
+                chunk_duration = (datetime.datetime.now(datetime.timezone.utc) - chunk_start).total_seconds() * 1000
                 
                 return {
                     'scrubbed_text': chunk_result.get('scrubbed_data', ''),
@@ -651,7 +685,7 @@ class EnterpriseDataPrivacyAgent(PersonalDataProtectionAgent):
                     'error': streaming_result['error'],
                     'file_path': str(file_path),
                     'processing_method': 'streaming_chunks',
-                    'duration_ms': (dt.now(timezone.utc) - start_time).total_seconds() * 1000
+                    'duration_ms': (datetime.datetime.now(datetime.timezone.utc) - start_time).total_seconds() * 1000
                 }
             
             # Aggregate results from all chunks
@@ -675,7 +709,7 @@ class EnterpriseDataPrivacyAgent(PersonalDataProtectionAgent):
             final_scrubbed_content = ''.join(all_scrubbed_chunks)
             
             # Calculate final processing statistics
-            total_duration = (dt.now(timezone.utc) - start_time).total_seconds() * 1000
+            total_duration = (datetime.datetime.now(datetime.timezone.utc) - start_time).total_seconds() * 1000
             
             # Create comprehensive result
             result = {
@@ -726,7 +760,7 @@ class EnterpriseDataPrivacyAgent(PersonalDataProtectionAgent):
             return result
             
         except Exception as e:
-            error_duration = (dt.now(timezone.utc) - start_time).total_seconds() * 1000
+            error_duration = (datetime.datetime.now(datetime.timezone.utc) - start_time).total_seconds() * 1000
             self.logger.error(f"Streaming file processing failed: {e}", request_id=request_id)
             
             return {
