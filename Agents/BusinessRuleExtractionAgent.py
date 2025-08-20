@@ -5,13 +5,22 @@ import uuid
 import datetime
 import time
 import asyncio
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from functools import lru_cache
 
 # Import other Agents from current location, change package location if moved
 from .BaseAgent import BaseAgent
 from .ComplianceMonitoringAgent import ComplianceMonitoringAgent, AuditLevel
 from .Exceptions import RuleExtractionError, ValidationError
+
+# Import Language Detection System (Phase 15A)
+from Utils.language_detection import LanguageDetector, DetectionResult, LanguageDetectionError
+
+# Import Intelligent Chunking System (Phase 15B)  
+from Utils.intelligent_chunker import IntelligentChunker, ChunkingResult
+
+# Import Rule Completeness Analyzer (Phase 15C)
+from Utils.rule_completeness_analyzer import RuleCompletenessAnalyzer, CompletenessStatus
 
 # Import the Google Generative AI library
 import google.generativeai as genai
@@ -166,8 +175,102 @@ class BusinessRuleExtractionAgent(BaseAgent):
         
         # Rule extraction specific configuration
         self.llm_client = llm_client
+        
+        # Initialize Language Detection System (Phase 15A)
+        try:
+            self.language_detector = LanguageDetector()
+            self.logger.debug("Language detection system initialized successfully")
+        except LanguageDetectionError as e:
+            self.logger.warning(f"Language detection initialization failed: {e}")
+            self.language_detector = None
+        
+        # Initialize Intelligent Chunking System (Phase 15B)
+        try:
+            self.intelligent_chunker = IntelligentChunker(self.language_detector)
+            self.logger.debug("Intelligent chunking system initialized successfully")
+        except Exception as e:
+            self.logger.warning(f"Intelligent chunker initialization failed: {e}")
+            self.intelligent_chunker = None
+        
+        # Initialize Rule Completeness Analyzer (Phase 15C)
+        try:
+            self.completeness_analyzer = RuleCompletenessAnalyzer()
+            self.logger.debug("Rule completeness analyzer initialized successfully")
+        except Exception as e:
+            self.logger.warning(f"Completeness analyzer initialization failed: {e}")
+            self.completeness_analyzer = None
 
     # get_ip_address() method now inherited from BaseAgent
+    
+    def _detect_language_and_get_chunking_params(self, filename: str, content: str) -> Tuple[DetectionResult, Dict[str, Any]]:
+        """
+        Detect programming language and return appropriate chunking parameters.
+        
+        Phase 15A: Language Detection & Profile System
+        Provides language-aware chunking with ±50% size flexibility.
+        
+        Args:
+            filename: Name of the file being processed
+            content: Content of the file
+            
+        Returns:
+            Tuple of (DetectionResult, chunking_parameters)
+        """
+        # Default chunking parameters (fallback)
+        default_params = {
+            "preferred_size": 175,
+            "min_size": 87,   # -50% flexibility
+            "max_size": 262,  # +50% flexibility
+            "overlap_size": 25
+        }
+        
+        if not self.language_detector:
+            self.logger.debug("Language detector not available, using default chunking parameters")
+            return None, default_params
+        
+        try:
+            # Detect programming language
+            detection_result = self.language_detector.detect_language(filename, content)
+            
+            self.logger.info(f"Language detection: {detection_result.language} "
+                           f"(confidence: {detection_result.confidence:.1%})")
+            
+            # Log detection evidence for debugging
+            if detection_result.evidence:
+                strong_patterns = len(detection_result.evidence.get('pattern_matches', {}).get('strong', []))
+                rule_patterns = sum(match['matches'] for match in 
+                                  detection_result.evidence.get('pattern_matches', {}).get('rules', []))
+                self.logger.debug(f"Detection evidence: {strong_patterns} strong patterns, "
+                                f"{rule_patterns} rule patterns")
+            
+            # Get language-specific chunking parameters
+            if detection_result.profile and detection_result.is_confident:
+                chunking_config = detection_result.profile.chunking
+                language_params = {
+                    "preferred_size": chunking_config.get('preferred_size', 175),
+                    "min_size": chunking_config.get('min_size', 87),
+                    "max_size": chunking_config.get('max_size', 262),
+                    "overlap_size": chunking_config.get('overlap_size', 25),
+                    "section_priority": chunking_config.get('section_priority', {}),
+                    "language": detection_result.language
+                }
+                
+                self.logger.info(f"Using {detection_result.language}-specific chunking: "
+                               f"size={language_params['preferred_size']} "
+                               f"(range: {language_params['min_size']}-{language_params['max_size']})")
+                
+                return detection_result, language_params
+            else:
+                self.logger.warning(f"Low confidence language detection ({detection_result.confidence:.1%}), "
+                                  f"using default chunking parameters")
+                for recommendation in detection_result.recommendations:
+                    self.logger.info(f"Recommendation: {recommendation}")
+                
+                return detection_result, default_params
+                
+        except Exception as e:
+            self.logger.error(f"Language detection failed: {e}")
+            return None, default_params
 
     def _prepare_llm_prompt(self, code_snippet: str, context: Optional[str] = None) -> tuple[str, str]:
         """
@@ -320,24 +423,42 @@ class BusinessRuleExtractionAgent(BaseAgent):
             )
         )
         
-    def _chunk_large_file(self, content: str, chunk_size: int = None, overlap_size: int = None) -> List[str]:
+    def _chunk_large_file(self, content: str, chunk_size: int = None, overlap_size: int = None, chunking_params: Dict[str, Any] = None, filename: str = "unknown.txt") -> List[str]:
         """
-        Enterprise-grade chunking strategy for large files.
+        Enterprise-grade chunking strategy for large files with language-aware processing.
+        
+        Phase 15A Enhancement: Uses language detection for optimal chunking parameters.
         
         Args:
             content: The full file content as a string
-            chunk_size: Number of lines per chunk (uses config if None)
-            overlap_size: Number of overlapping lines between chunks (uses config if None)
+            chunk_size: Number of lines per chunk (uses language-specific config if None)
+            overlap_size: Number of overlapping lines between chunks (uses language-specific config if None)
+            chunking_params: Language-specific chunking parameters from detection system
+            filename: Name of file being processed for language detection
             
         Returns:
-            List of chunks, each containing context + chunk content
+            List of chunks, each containing context + chunk content optimized for detected language
         """
-        # Get configuration values
+        # Phase 15A: Language-aware chunking parameter selection
+        if not chunking_params:
+            # Perform language detection if parameters not provided
+            detection_result, chunking_params = self._detect_language_and_get_chunking_params(filename, content)
+        
+        # Use language-specific parameters or fallback to configuration
         processing_config = self.agent_config.get('processing_limits', {})
-        chunk_size = chunk_size or processing_config.get('chunking_line_threshold', 175)
-        overlap_size = overlap_size or processing_config.get('chunk_overlap_size', 25)
+        chunk_size = chunk_size or chunking_params.get('preferred_size', processing_config.get('chunking_line_threshold', 175))
+        overlap_size = overlap_size or chunking_params.get('overlap_size', processing_config.get('chunk_overlap_size', 25))
+        
+        # Get language-specific constraints
+        MIN_CHUNK_SIZE = chunking_params.get('min_size', processing_config.get('min_chunk_lines', 10))
+        MAX_CHUNK_SIZE = chunking_params.get('max_size', chunk_size * 2)
         MAX_CHUNKS = processing_config.get('max_file_chunks', 50)
-        MIN_CHUNK_SIZE = processing_config.get('min_chunk_lines', 10)
+        
+        # Log language-aware chunking decision
+        language = chunking_params.get('language', 'unknown')
+        if language != 'unknown':
+            self.logger.info(f"Using {language}-optimized chunking: size={chunk_size} "
+                           f"(range: {MIN_CHUNK_SIZE}-{MAX_CHUNK_SIZE}), overlap={overlap_size}")
         
         lines = content.split('\n')
         total_lines = len(lines)
@@ -429,14 +550,34 @@ class BusinessRuleExtractionAgent(BaseAgent):
         should_chunk = line_count > 175  # Threshold for chunking
         return should_chunk, line_count
     
-    def _process_file_chunks(self, legacy_code_snippet: str, context: Optional[str], request_id: str) -> tuple[List[Dict], int, int, str]:
+    def _process_file_chunks(self, legacy_code_snippet: str, context: Optional[str], request_id: str, filename: str = "unknown.txt") -> tuple[List[Dict], int, int, str]:
         """
         Process large files using chunked approach with progress tracking.
+        
+        Phase 15A Enhancement: Uses language-aware chunking for optimal rule extraction.
         
         Returns:
             Tuple of (extracted_rules, tokens_input, tokens_output, llm_response_raw)
         """
-        chunks = self._chunk_large_file(legacy_code_snippet)
+        # Phase 15B: Intelligent chunking replaces fixed-size chunking
+        if self.intelligent_chunker:
+            self.logger.info("Using intelligent section-aware chunking for optimal rule extraction")
+            chunking_result = self.intelligent_chunker.chunk_content(legacy_code_snippet, filename)
+            chunks = chunking_result.chunks
+            # Store chunking result for completeness analysis
+            self._last_chunking_result = chunking_result
+            
+            # Log intelligent chunking results
+            self.logger.info(f"Intelligent chunking: {chunking_result.language} language detected")
+            self.logger.info(f"Strategy used: {chunking_result.strategy_used.value}")
+            self.logger.info(f"Created {chunking_result.chunk_count} optimized chunks")
+            self.logger.info(f"Average chunk size: {chunking_result.average_chunk_size:.1f} lines")
+            self.logger.info(f"Estimated rule coverage: {chunking_result.estimated_rule_coverage:.1%}")
+        else:
+            # Fallback to legacy chunking if intelligent chunker unavailable
+            self.logger.warning("Intelligent chunker unavailable, falling back to legacy chunking")
+            detection_result, chunking_params = self._detect_language_and_get_chunking_params(filename, legacy_code_snippet)
+            chunks = self._chunk_large_file(legacy_code_snippet, chunking_params=chunking_params, filename=filename)
         all_rules = []
         total_tokens_input = 0
         total_tokens_output = 0
@@ -466,6 +607,10 @@ class BusinessRuleExtractionAgent(BaseAgent):
                 
                 self.logger.debug(f"Chunk {chunk_idx + 1} extracted {len(chunk_rules)} rules", request_id=request_id)
                 
+                # Phase 15C: Real-time completeness monitoring
+                if self.completeness_analyzer and hasattr(self, '_enable_realtime_monitoring'):
+                    self._monitor_extraction_progress(all_rules, chunk_idx + 1, len(chunks), request_id)
+                
             except KeyboardInterrupt:
                 self.logger.warning(f"Processing interrupted by user. Returning partial results from {chunk_idx} chunks.", request_id=request_id)
                 break
@@ -483,13 +628,23 @@ class BusinessRuleExtractionAgent(BaseAgent):
         llm_response_raw = f"Processed {len(chunks)} chunks, extracted {len(deduplicated_rules)} rules (deduplicated from {len(all_rules)} raw)"
         return deduplicated_rules, total_tokens_input, total_tokens_output, llm_response_raw
     
-    def _process_single_file(self, legacy_code_snippet: str, context: Optional[str], request_id: str) -> tuple[List[Dict], int, int, str]:
+    def _process_single_file(self, legacy_code_snippet: str, context: Optional[str], request_id: str, filename: str = "unknown.txt") -> tuple[List[Dict], int, int, str]:
         """
-        Process small files using single-pass approach.
+        Process small files using single-pass approach with language detection.
+        
+        Phase 15A Enhancement: Includes language detection for consistency.
         
         Returns:
             Tuple of (extracted_rules, tokens_input, tokens_output, llm_response_raw)
         """
+        # Phase 15A: Language detection for single files (informational)
+        if self.language_detector:
+            try:
+                detection_result = self.language_detector.detect_language(filename, legacy_code_snippet)
+                self.logger.info(f"Single file language detection: {detection_result.language} "
+                               f"(confidence: {detection_result.confidence:.1%})")
+            except Exception as e:
+                self.logger.debug(f"Language detection failed for single file: {e}")
         system_prompt, user_prompt = self._prepare_llm_prompt(legacy_code_snippet, context)
         full_prompt = f"{system_prompt}\n\n{user_prompt}"
         
@@ -510,6 +665,51 @@ class BusinessRuleExtractionAgent(BaseAgent):
         extracted_rules = self._aggregate_chunk_results([response_data])
         
         return extracted_rules, tokens_input, tokens_output, llm_response_raw
+    
+    def _monitor_extraction_progress(self, current_rules: List[Dict], chunks_processed: int, total_chunks: int, request_id: str) -> None:
+        """
+        Monitor extraction progress in real-time with completeness analysis.
+        
+        Phase 15C: Provides real-time feedback on extraction completeness.
+        """
+        if not self.completeness_analyzer:
+            return
+        
+        # Estimate expected total rules (simplified for real-time monitoring)
+        expected_total = 24  # Known from COBOL analysis - could be made dynamic
+        
+        # Create progress data for monitoring
+        chunk_results = [current_rules]  # Simplified - in real implementation, would track per-chunk
+        
+        try:
+            progress = self.completeness_analyzer.monitor_extraction_progress(
+                chunk_results=chunk_results,
+                expected_total=expected_total
+            )
+            
+            current_count = len(current_rules)
+            progress_pct = progress['progress_percentage']
+            
+            # Log progress with completeness context
+            self.logger.progress(f"Extracted {current_count} rules so far ({progress_pct:.1f}% of expected)", request_id=request_id)
+            
+            # Issue warnings if below thresholds
+            for warning in progress['warnings']:
+                if warning['level'] == 'critical':
+                    self.logger.warning(f"COMPLETENESS CRITICAL: {warning['message']}", request_id=request_id)
+                    self.logger.warning(f"Recommendation: {warning['recommendation']}", request_id=request_id)
+                elif warning['level'] == 'warning':
+                    self.logger.warning(f"COMPLETENESS WARNING: {warning['message']}", request_id=request_id)
+                    self.logger.info(f"Recommendation: {warning['recommendation']}", request_id=request_id)
+            
+            # Positive feedback when approaching/achieving target
+            if progress_pct >= 90 and progress_pct < 95:
+                self.logger.progress(f"EXCELLENT: Approaching completeness target ({progress_pct:.1f}%)", request_id=request_id)
+            elif progress_pct >= 95:
+                self.logger.progress(f"OUTSTANDING: Exceeding completeness target ({progress_pct:.1f}%)", request_id=request_id)
+            
+        except Exception as e:
+            self.logger.debug(f"Progress monitoring failed: {e}", request_id=request_id)
     
     def _handle_chunk_processing(self, chunk_content: str, context: Optional[str], chunk_idx: int, request_id: str) -> tuple[List[Dict], int, int]:
         """
@@ -652,15 +852,19 @@ class BusinessRuleExtractionAgent(BaseAgent):
         self.logger.info(f"Total processing time: {total_time:.1f} seconds", request_id=request_id)
         self.logger.info(f"Average time per chunk: {total_time / len(chunks):.1f} seconds", request_id=request_id)
 
-    def extract_and_translate_rules(self, legacy_code_snippet: str, context: Optional[str] = None, audit_level: int = AuditLevel.LEVEL_1.value) -> Dict[str, Any]:
+    def extract_and_translate_rules(self, legacy_code_snippet: str, context: Optional[str] = None, audit_level: int = AuditLevel.LEVEL_1.value, filename: str = "unknown.txt") -> Dict[str, Any]:
         """
         Extracts and translates business rules from a legacy code snippet using an LLM,
-        and logs the process based on audit_level.
+        with intelligent language-aware chunking and audit logging.
+
+        Phase 15A Enhancement: Automatically detects programming language and uses 
+        optimized chunking parameters for better rule extraction accuracy.
 
         Args:
             legacy_code_snippet: A string containing the legacy code to analyze.
             context: Optional, additional context for the LLM (e.g., system purpose).
             audit_level: An integer representing the desired audit granularity (1-4).
+            filename: Name of the file being processed (for language detection).
 
         Returns:
             A dictionary containing the extracted rules and the audit log.
@@ -755,12 +959,12 @@ class BusinessRuleExtractionAgent(BaseAgent):
             if should_chunk:
                 self.logger.info(f"Large file detected ({line_count} lines). Using chunked processing...", request_id=request_id)
                 extracted_rules, tokens_input, tokens_output, llm_response_raw = self._process_file_chunks(
-                    legacy_code_snippet, context, request_id
+                    legacy_code_snippet, context, request_id, filename
                 )
             else:
                 self.logger.info(f"Small file ({line_count} lines). Using single-pass processing...", request_id=request_id)
                 extracted_rules, tokens_input, tokens_output, llm_response_raw = self._process_single_file(
-                    legacy_code_snippet, context, request_id
+                    legacy_code_snippet, context, request_id, filename
                 )
 
         except json.JSONDecodeError as e:
@@ -860,6 +1064,10 @@ class BusinessRuleExtractionAgent(BaseAgent):
             audit_level=audit_level
         )
 
+        # Phase 15C: Final completeness analysis
+        if self.completeness_analyzer and extracted_rules:
+            self._perform_final_completeness_analysis(legacy_code_snippet, extracted_rules, filename, request_id)
+        
         # Debug logging to trace the issue
         self.logger.debug(f"Final return - extracted_rules type: {type(extracted_rules)}, length: {len(extracted_rules)}", request_id=request_id)
         
@@ -867,6 +1075,126 @@ class BusinessRuleExtractionAgent(BaseAgent):
             "extracted_rules": extracted_rules,
             "audit_log": audit_log_data
         }
+    
+    def _perform_final_completeness_analysis(self, source_content: str, extracted_rules: List[Dict], 
+                                           filename: str, request_id: str) -> None:
+        """
+        Perform final completeness analysis of extracted business rules.
+        
+        Phase 15C: Analyzes the completeness of rule extraction and provides
+        actionable recommendations for improvement.
+        
+        Args:
+            source_content: Original source code content
+            extracted_rules: List of extracted rule dictionaries  
+            filename: Name of the file being analyzed
+            request_id: Unique request identifier for logging
+        """
+        try:
+            # Get chunking result if available for enhanced analysis
+            chunking_result = getattr(self, '_last_chunking_result', None)
+            
+            # Perform comprehensive completeness analysis
+            completeness_report = self.completeness_analyzer.analyze_extraction_completeness(
+                source_content=source_content,
+                extracted_rules=extracted_rules,
+                chunking_result=chunking_result,
+                filename=filename
+            )
+            
+            # Log comprehensive completeness results
+            self.logger.info(
+                f"Completeness Analysis Complete: {completeness_report.total_extracted_rules}/"
+                f"{completeness_report.total_expected_rules} rules extracted "
+                f"({completeness_report.completeness_percentage:.1f}%) - "
+                f"Status: {completeness_report.status.value.upper()}",
+                request_id=request_id
+            )
+            
+            # Log target achievement status
+            if completeness_report.is_target_achieved:
+                self.logger.success(
+                    f"SUCCESS: 90% completeness target achieved! "
+                    f"({completeness_report.completeness_percentage:.1f}%)",
+                    request_id=request_id
+                )
+            else:
+                gap_count = completeness_report.gap_count
+                self.logger.warning(
+                    f"Target not achieved: {gap_count} rules missing for 90% threshold. "
+                    f"Current: {completeness_report.completeness_percentage:.1f}%",
+                    request_id=request_id
+                )
+            
+            # Log section-level analysis
+            poor_sections = []
+            for section_name, analysis in completeness_report.section_analysis.items():
+                if analysis['completeness'] < 90:
+                    poor_sections.append(f"{section_name} ({analysis['completeness']:.1f}%)")
+            
+            if poor_sections:
+                self.logger.warning(
+                    f"Sections below 90% completeness: {', '.join(poor_sections)}",
+                    request_id=request_id
+                )
+            
+            # Log key recommendations
+            if completeness_report.recommendations:
+                self.logger.info(f"Key recommendations:", request_id=request_id)
+                for i, recommendation in enumerate(completeness_report.recommendations[:3], 1):
+                    self.logger.info(f"  {i}. {recommendation}", request_id=request_id)
+            
+            # Log rule gaps by category
+            if completeness_report.rule_gaps:
+                gap_summary = {}
+                for gap in completeness_report.rule_gaps:
+                    category = gap.category.value
+                    gap_summary[category] = gap_summary.get(category, 0) + gap.gap_count
+                
+                if gap_summary:
+                    gap_details = ", ".join([f"{cat}: {count}" for cat, count in gap_summary.items()])
+                    self.logger.warning(f"Missing rules by category: {gap_details}", request_id=request_id)
+            
+            # Store analysis results for external access
+            self._last_completeness_report = completeness_report
+            
+            # Create audit entry for completeness analysis
+            self.audit_system.log_activity(
+                agent_name="BusinessRuleExtractionAgent",
+                activity_type="completeness_analysis",
+                details={
+                    "filename": filename,
+                    "total_expected": completeness_report.total_expected_rules,
+                    "total_extracted": completeness_report.total_extracted_rules,
+                    "completeness_percentage": completeness_report.completeness_percentage,
+                    "status": completeness_report.status.value,
+                    "target_achieved": completeness_report.is_target_achieved,
+                    "gap_count": completeness_report.gap_count,
+                    "processing_time_ms": completeness_report.processing_time_ms,
+                    "recommendations_count": len(completeness_report.recommendations)
+                },
+                request_id=request_id,
+                user_id="system",
+                session_id="analysis_session",
+                ip_address="internal",
+                user_agent="BusinessRuleExtractionAgent",
+                audit_level=AuditLevel.INFO
+            )
+            
+        except Exception as e:
+            self.logger.error(f"Completeness analysis failed: {e}", request_id=request_id)
+            # Don't let completeness analysis failure break the main extraction
+            import traceback
+            self.logger.debug(f"Completeness analysis error details: {traceback.format_exc()}", request_id=request_id)
+    
+    def get_last_completeness_report(self):
+        """
+        Get the most recent completeness analysis report.
+        
+        Returns:
+            CompletenessReport object or None if no analysis has been performed
+        """
+        return getattr(self, '_last_completeness_report', None)
     
     def get_agent_info(self) -> Dict[str, Any]:
         """
@@ -886,7 +1214,11 @@ class BusinessRuleExtractionAgent(BaseAgent):
                 "business_rule_extraction",
                 "code_translation",
                 "large_file_processing",
-                "chunked_processing"
+                "chunked_processing",
+                "intelligent_chunking",
+                "language_detection",
+                "completeness_analysis",
+                "real_time_progress_monitoring"
             ],
             "supported_languages": [
                 "Java", "C++", "COBOL", "CLIPS", "Drools", 

@@ -113,7 +113,8 @@ def test_cobol_business_rule_extraction():
         result = agent.extract_and_translate_rules(
             legacy_code_snippet=cobol_code,
             context="Legacy COBOL insurance policy validation system from 1985 containing embedded business rules for policy approval",
-            audit_level=AuditLevel.LEVEL_1.value
+            audit_level=AuditLevel.LEVEL_1.value,
+            filename="sample_legacy_insurance.cbl"
         )
         
         print("SUCCESS: Input validation passed!")

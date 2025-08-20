@@ -59,10 +59,22 @@ except ImportError as e:
 # Initialize Flask application
 app = Flask(__name__)
 
+# Load configuration for Flask settings
+try:
+    from Utils.config_loader import load_config
+    flask_config = load_config('agent_defaults', {}).get('agent_defaults', {}).get('flask_settings', {})
+except Exception:
+    # Fallback configuration if config loading fails
+    flask_config = {
+        'max_content_length_mb': 16,
+        'json_sort_keys': False,
+        'jsonify_prettyprint': False
+    }
+
 # Configure Flask for production
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max request size
-app.config['JSON_SORT_KEYS'] = False  # Preserve JSON key order
-app.config['JSONIFY_PRETTYPRINT_REGULAR'] = False  # Disable pretty printing in production
+app.config['MAX_CONTENT_LENGTH'] = flask_config.get('max_content_length_mb', 16) * 1024 * 1024  # MB to bytes
+app.config['JSON_SORT_KEYS'] = flask_config.get('json_sort_keys', False)  # Preserve JSON key order
+app.config['JSONIFY_PRETTYPRINT_REGULAR'] = flask_config.get('jsonify_prettyprint', False)  # Disable pretty printing
 
 # Trust proxy headers (for deployment behind load balancer)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
@@ -73,7 +85,7 @@ CORS(app,
      methods=['GET', 'POST', 'OPTIONS'],
      allow_headers=['Content-Type', 'Authorization', 'X-API-Key', 'X-Request-ID'],
      expose_headers=['X-Request-ID', 'X-Processing-Time-Ms'],
-     max_age=86400)  # Cache preflight requests for 24 hours
+     max_age=flask_config.get('cors_max_age_seconds', 86400))  # Cache preflight requests duration from config
 
 # Register API documentation blueprint
 app.register_blueprint(api_blueprint, url_prefix='/api/v1')
@@ -190,11 +202,15 @@ def authenticate_request() -> bool:
     return api_key == expected_key
 
 
-def rate_limit_check(client_id: str, limit: int = 100, window: int = 3600) -> bool:
+def rate_limit_check(client_id: str, limit: int = None, window: int = None) -> bool:
     """
     Simple in-memory rate limiting.
     In production, use Redis or similar for distributed rate limiting.
     """
+    # Get rate limiting configuration
+    limit = limit or flask_config.get('rate_limit_per_hour', 100)
+    window = window or flask_config.get('rate_limit_window_seconds', 3600)
+    
     # Skip rate limiting in development
     if os.environ.get('FLASK_ENV') == 'development':
         return True

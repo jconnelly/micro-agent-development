@@ -1,0 +1,381 @@
+# Language Profiles for Intelligent Chunking System
+# Phase 15A - Language Detection & Profile System
+#
+# This file defines language-specific patterns, chunking parameters, and validation rules
+# for the BusinessRuleExtractionAgent's intelligent chunking system.
+
+# Global Configuration
+chunking_system:
+  version: "1.0.0"
+  default_chunk_size: 175
+  default_overlap_size: 25
+  completeness_threshold: 0.90  # 90% rule extraction required
+  max_chunk_size_variance: 0.50  # ±50% flexibility
+
+# Language Profiles
+languages:
+  
+  # COBOL - Common Business-Oriented Language
+  cobol:
+    name: "COBOL (Common Business-Oriented Language)"
+    description: "Legacy mainframe business programming language"
+    confidence_required: 0.80  # 80% confidence needed for auto-detection
+    
+    # File identification patterns
+    file_extensions: [".cbl", ".cob", ".cobol", ".cpy"]
+    mime_types: ["text/x-cobol"]
+    
+    # Strong confidence patterns (high weight for language detection)
+    strong_patterns:
+      - "IDENTIFICATION DIVISION"
+      - "ENVIRONMENT DIVISION"  
+      - "DATA DIVISION"
+      - "PROCEDURE DIVISION"
+      - "WORKING-STORAGE SECTION"
+      - "PIC\\s+[X9V]+\\s+VALUE"
+      - "MOVE\\s+.*TO\\s+"
+      - "PERFORM\\s+\\w+"
+    
+    # Supporting patterns (medium weight)
+    supporting_patterns:
+      - "77\\s+\\w+.*PIC"
+      - "88\\s+\\w+.*VALUE"
+      - "GO TO\\s+\\w+"
+      - "IF.*END-IF"
+      - "COMPUTE\\s+.*="
+      - "DISPLAY\\s+"
+      - "ACCEPT\\s+"
+    
+    # Business rule indicators
+    rule_patterns:
+      - "\\*.*Business Rule"
+      - "IF\\s+.*THEN"
+      - "IF\\s+.*GO TO"  
+      - "WHEN\\s+.*"
+      - "EVALUATE\\s+.*"
+      - "PERFORM\\s+UNTIL"
+      - "MOVE\\s+'REJECTED'\\s+TO"
+      - "MOVE\\s+'APPROVED'\\s+TO"
+      - "MOVE\\s+'PENDING'\\s+TO"
+    
+    # Section boundary markers for intelligent chunking
+    section_markers:
+      - "\\w+-DIVISION\\."
+      - "\\w+-SECTION\\."
+      - "\\w+\\."  # COBOL paragraph names
+      - "PERFORM\\s+\\w+"
+      - "MAIN-PROGRAM\\."
+      - "VALIDATION-EXIT\\."
+    
+    # Chunking configuration
+    chunking:
+      preferred_size: 200     # COBOL tends to be verbose
+      min_size: 100          # -50% flexibility
+      max_size: 300          # +50% flexibility  
+      overlap_size: 30       # Slightly larger overlap for context
+      
+      # Priority for section breaks (higher = more important)
+      section_priority:
+        "PROCEDURE DIVISION": 100
+        "MAIN-PROGRAM": 90
+        "VALIDATION": 80
+        ".*-VALIDATION": 75
+        "CALCULATE": 70
+        "DISPLAY": 50
+    
+    # Expected rule density (rules per 100 lines)
+    rule_density:
+      expected_min: 8        # At least 8 rules per 100 lines
+      expected_max: 25       # Up to 25 rules per 100 lines
+      complexity_threshold: 15  # High complexity if >15 rules/100 lines
+
+  # Java - Object-Oriented Programming Language
+  java:
+    name: "Java"
+    description: "Object-oriented enterprise programming language"
+    confidence_required: 0.85
+    
+    file_extensions: [".java"]
+    mime_types: ["text/x-java-source"]
+    
+    strong_patterns:
+      - "package\\s+[\\w\\.]+;"
+      - "import\\s+[\\w\\.]+;"
+      - "public\\s+class\\s+\\w+"
+      - "public\\s+static\\s+void\\s+main"
+      - "private\\s+.*\\s+\\w+\\s*\\("
+      - "public\\s+.*\\s+\\w+\\s*\\("
+    
+    supporting_patterns:
+      - "if\\s*\\([^)]+\\)\\s*\\{"
+      - "while\\s*\\([^)]+\\)\\s*\\{"
+      - "for\\s*\\([^)]+\\)\\s*\\{"
+      - "try\\s*\\{"
+      - "catch\\s*\\([^)]+\\)\\s*\\{"
+      - "throw\\s+new\\s+"
+      - "return\\s+.*;"
+    
+    rule_patterns:
+      - "if\\s*\\([^)]+\\)\\s*\\{"
+      - "switch\\s*\\([^)]+\\)\\s*\\{"
+      - "case\\s+.*:"
+      - "while\\s*\\([^)]+\\)\\s*\\{"
+      - "for\\s*\\([^)]+\\)\\s*\\{"
+      - "//.*rule|//.*Rule|//.*RULE"
+      - "/\\*.*rule.*\\*/"
+    
+    section_markers:
+      - "class\\s+\\w+"
+      - "interface\\s+\\w+"
+      - "public\\s+.*\\s+\\w+\\s*\\("
+      - "private\\s+.*\\s+\\w+\\s*\\("
+      - "protected\\s+.*\\s+\\w+\\s*\\("
+      - "static\\s+.*\\s+\\w+\\s*\\("
+    
+    chunking:
+      preferred_size: 150
+      min_size: 75
+      max_size: 225
+      overlap_size: 20
+      
+      section_priority:
+        "public class": 100
+        "public.*method": 80
+        "private.*method": 70
+        "constructor": 75
+        "static.*method": 65
+    
+    rule_density:
+      expected_min: 5
+      expected_max: 20
+      complexity_threshold: 12
+
+  # Pascal - Structured Programming Language  
+  pascal:
+    name: "Pascal"
+    description: "Structured programming language popular in legacy systems"
+    confidence_required: 0.80
+    
+    file_extensions: [".pas", ".pascal", ".pp"]
+    mime_types: ["text/x-pascal"]
+    
+    strong_patterns:
+      - "program\\s+\\w+"
+      - "procedure\\s+\\w+"
+      - "function\\s+\\w+.*:"
+      - "begin"
+      - "end\\."
+      - "var\\s+"
+      - "const\\s+"
+      - "type\\s+"
+    
+    supporting_patterns:
+      - "if\\s+.*then"
+      - "while\\s+.*do"
+      - "for\\s+.*to\\s+.*do"
+      - "case\\s+.*of"
+      - "repeat\\s+"
+      - "until\\s+"
+      - "writeln\\s*\\("
+      - "readln\\s*\\("
+    
+    rule_patterns:
+      - "if\\s+.*then"
+      - "case\\s+.*of"
+      - "while\\s+.*do"
+      - "for\\s+.*do"
+      - "repeat.*until"
+      - "\\{.*rule.*\\}"
+      - "\\(\\*.*rule.*\\*\\)"
+    
+    section_markers:
+      - "program\\s+\\w+"
+      - "procedure\\s+\\w+"
+      - "function\\s+\\w+"
+      - "begin"
+      - "var\\s+"
+      - "const\\s+"
+      - "type\\s+"
+    
+    chunking:
+      preferred_size: 175
+      min_size: 87
+      max_size: 262
+      overlap_size: 25
+      
+      section_priority:
+        "program": 100
+        "procedure": 80
+        "function": 80
+        "begin": 70
+        "var": 60
+    
+    rule_density:
+      expected_min: 6
+      expected_max: 18
+      complexity_threshold: 12
+
+  # C/C++ - System Programming Languages
+  cpp:
+    name: "C/C++"
+    description: "System programming languages with business logic"
+    confidence_required: 0.75
+    
+    file_extensions: [".c", ".cpp", ".cxx", ".cc", ".h", ".hpp", ".hxx"]
+    mime_types: ["text/x-c", "text/x-c++"]
+    
+    strong_patterns:
+      - "#include\\s*[<\"].*[>\"]"
+      - "int\\s+main\\s*\\("
+      - "class\\s+\\w+"
+      - "struct\\s+\\w+"
+      - "namespace\\s+\\w+"
+      - "#define\\s+\\w+"
+    
+    supporting_patterns:
+      - "if\\s*\\([^)]+\\)\\s*\\{"
+      - "while\\s*\\([^)]+\\)\\s*\\{"
+      - "for\\s*\\([^)]*;[^)]*;[^)]*\\)\\s*\\{"
+      - "switch\\s*\\([^)]+\\)\\s*\\{"
+      - "case\\s+.*:"
+      - "return\\s+.*;"
+      - "printf\\s*\\("
+    
+    rule_patterns:
+      - "if\\s*\\([^)]+\\)\\s*\\{"
+      - "switch\\s*\\([^)]+\\)\\s*\\{"
+      - "case\\s+.*:"
+      - "while\\s*\\([^)]+\\)\\s*\\{"
+      - "for\\s*\\([^)]*\\)\\s*\\{"
+      - "//.*rule|//.*Rule"
+      - "/\\*.*rule.*\\*/"
+    
+    section_markers:
+      - "class\\s+\\w+"
+      - "struct\\s+\\w+"
+      - "namespace\\s+\\w+"
+      - ".*\\s+\\w+\\s*\\([^)]*\\)\\s*\\{"  # Function definitions
+      - "#define\\s+\\w+"
+    
+    chunking:
+      preferred_size: 160
+      min_size: 80
+      max_size: 240
+      overlap_size: 20
+      
+      section_priority:
+        "class": 90
+        "struct": 80
+        "namespace": 70
+        "function": 75
+        "main": 100
+    
+    rule_density:
+      expected_min: 4
+      expected_max: 15
+      complexity_threshold: 10
+
+  # PL/I - IBM Programming Language/One  
+  pli:
+    name: "PL/I (Programming Language One)"
+    description: "IBM legacy programming language for business applications"
+    confidence_required: 0.80
+    
+    file_extensions: [".pli", ".pl1", ".pls"]
+    mime_types: ["text/x-pli"]
+    
+    strong_patterns:
+      - "\\w+:\\s*PROCEDURE"
+      - "DCL\\s+\\w+"
+      - "DO\\s+.*;"
+      - "END\\s+\\w+;"
+      - "IF\\s+.*THEN"
+      - "SELECT\\s*\\("
+    
+    supporting_patterns:
+      - "PUT\\s+LIST"
+      - "GET\\s+LIST"
+      - "WHEN\\s*\\("
+      - "OTHERWISE"
+      - "GO\\s+TO\\s+\\w+"
+      - "CALL\\s+\\w+"
+    
+    rule_patterns:
+      - "IF\\s+.*THEN"
+      - "SELECT\\s*\\([^)]*\\)"
+      - "WHEN\\s*\\("
+      - "DO\\s+WHILE"
+      - "DO\\s+UNTIL"
+      - "/\\*.*RULE.*\\*/"
+    
+    section_markers:
+      - "\\w+:\\s*PROCEDURE"
+      - "DCL\\s+\\w+"
+      - "BEGIN"
+      - "END\\s+\\w+"
+    
+    chunking:
+      preferred_size: 180
+      min_size: 90
+      max_size: 270
+      overlap_size: 25
+      
+      section_priority:
+        "PROCEDURE": 100
+        "DCL": 70
+        "BEGIN": 80
+        "END": 60
+    
+    rule_density:
+      expected_min: 7
+      expected_max: 20
+      complexity_threshold: 13
+
+# Fallback configuration for unknown languages
+fallback:
+  name: "Unknown Language"
+  description: "Fallback profile for unrecognized file types"
+  
+  # Generic programming patterns
+  rule_patterns:
+    - "if\\s*\\(.*\\)"
+    - "IF\\s+.*THEN"
+    - "when\\s+.*"
+    - "case\\s+.*"
+    - "while\\s*\\(.*\\)"
+    - "for\\s*\\(.*\\)"
+    - "//.*rule"
+    - "/\\*.*rule.*\\*/"
+    - "#.*rule"
+    - "\\*.*rule"
+  
+  chunking:
+    preferred_size: 175      # Use default
+    min_size: 87            # -50%
+    max_size: 262           # +50%
+    overlap_size: 25
+    
+    section_priority: {}     # No specific priorities
+  
+  rule_density:
+    expected_min: 3
+    expected_max: 12
+    complexity_threshold: 8
+
+# Language Detection Configuration
+detection:
+  # Minimum confidence required for automatic detection
+  auto_detection_threshold: 0.80
+  
+  # Scoring weights for detection algorithm
+  scoring:
+    strong_pattern_weight: 10.0
+    supporting_pattern_weight: 3.0
+    file_extension_weight: 15.0
+    rule_pattern_weight: 5.0
+    
+  # Analysis parameters
+  analysis:
+    sample_lines: 100       # Analyze first 100 lines for detection
+    min_pattern_matches: 3  # Need at least 3 pattern matches
+    confidence_boost_threshold: 5  # Boost confidence if >5 strong patterns
