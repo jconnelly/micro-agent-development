@@ -162,7 +162,7 @@ class RuleDocumentationGeneratorAgent(BaseAgent):
     """
     def __init__(self, audit_system: ComplianceMonitoringAgent, llm_client: Any = None, 
                  agent_id: str = None, log_level: int = 0, model_name: str = None,
-                 llm_provider = None):
+                 llm_provider = None, agent_name: str = "RuleDocumentationGeneratorAgent"):
         """
         Initialize the RuleDocumentationGeneratorAgent with BYO-LLM support.
 
@@ -173,6 +173,7 @@ class RuleDocumentationGeneratorAgent(BaseAgent):
             log_level: 0 for production (silent), 1 for development (verbose)
             model_name: Name of the LLM model being used (optional, inferred from provider)
             llm_provider: LLM provider instance or provider type string (defaults to Gemini)
+            agent_name: Human-readable name for this agent (defaults to "RuleDocumentationGeneratorAgent")
         """
         # Initialize base agent with BYO-LLM support
         super().__init__(
@@ -181,7 +182,7 @@ class RuleDocumentationGeneratorAgent(BaseAgent):
             log_level=log_level,
             model_name=model_name,
             llm_provider=llm_provider,
-            agent_name="RuleDocumentationGeneratorAgent"
+            agent_name=agent_name
         )
         
         # Documentation-specific configuration

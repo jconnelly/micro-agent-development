@@ -58,6 +58,9 @@ agent_defaults:
     min_chunk_lines: 10        # Minimum lines per processing chunk
     chunking_line_threshold: 175  # Threshold for switching to chunked processing
     max_context_lines: 50      # Maximum lines for context extraction
+    chunk_overlap_size: 25     # Number of overlapping lines between chunks
+    chunk_size_mb: 1          # Default chunk size for streaming processing (MB)
+    max_log_message_length: 2000  # Maximum length for log messages
     
   # Model Configuration Defaults
   model_defaults:
@@ -81,6 +84,17 @@ agent_defaults:
     log_exceptions: true              # Log all exceptions to audit system
     continue_on_partial_failure: true # Continue processing on non-critical errors
     max_consecutive_failures: 5      # Max failures before stopping processing
+
+  # Flask Application Settings
+  flask_settings:
+    description: "Default Flask application configuration settings"
+    max_content_length_mb: 16         # Maximum request size in MB
+    max_file_size_mb: 50             # Maximum file size for processing
+    rate_limit_per_hour: 100         # API rate limit per client per hour
+    rate_limit_window_seconds: 3600  # Rate limiting window in seconds
+    cors_max_age_seconds: 86400      # CORS preflight cache duration (24 hours)
+    json_sort_keys: false            # Preserve JSON key order in responses
+    jsonify_prettyprint: false       # Disable pretty printing for performance
 
 # Environment-Specific Overrides
 environments:

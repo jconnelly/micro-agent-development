@@ -162,7 +162,7 @@ class ComplianceMonitoringAgent:
         This class uses business-friendly naming optimized for stakeholder
         communications and enterprise documentation.
     """
-    def __init__(self, log_storage_path: str = "audit_logs.jsonl"):
+    def __init__(self, log_storage_path: str = "audit_logs.jsonl") -> None:
         """
         Initializes the AgentAuditing system.
 

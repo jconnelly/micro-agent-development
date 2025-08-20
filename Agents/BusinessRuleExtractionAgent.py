@@ -320,21 +320,24 @@ class BusinessRuleExtractionAgent(BaseAgent):
             )
         )
         
-    def _chunk_large_file(self, content: str, chunk_size: int = 175, overlap_size: int = 25) -> List[str]:
+    def _chunk_large_file(self, content: str, chunk_size: int = None, overlap_size: int = None) -> List[str]:
         """
         Enterprise-grade chunking strategy for large files.
         
         Args:
             content: The full file content as a string
-            chunk_size: Number of lines per chunk (default 175 for optimal LLM context)
-            overlap_size: Number of overlapping lines between chunks (default 25)
+            chunk_size: Number of lines per chunk (uses config if None)
+            overlap_size: Number of overlapping lines between chunks (uses config if None)
             
         Returns:
             List of chunks, each containing context + chunk content
         """
-        # Defensive programming constants
-        MAX_CHUNKS = 50
-        MIN_CHUNK_SIZE = 10
+        # Get configuration values
+        processing_config = self.agent_config.get('processing_limits', {})
+        chunk_size = chunk_size or processing_config.get('chunking_line_threshold', 175)
+        overlap_size = overlap_size or processing_config.get('chunk_overlap_size', 25)
+        MAX_CHUNKS = processing_config.get('max_file_chunks', 50)
+        MIN_CHUNK_SIZE = processing_config.get('min_chunk_lines', 10)
         
         lines = content.split('\n')
         total_lines = len(lines)
@@ -665,6 +668,63 @@ class BusinessRuleExtractionAgent(BaseAgent):
         request_id = f"rule-ext-{uuid.uuid4().hex}"
         start_time = datetime.datetime.now(datetime.timezone.utc)
 
+        # Validate input parameters using standardized validation
+        try:
+            parameters = {
+                'legacy_code_snippet': legacy_code_snippet,
+                'context': context,
+                'audit_level': audit_level
+            }
+            
+            validation_rules = {
+                'legacy_code_snippet': {
+                    'expected_type': str,
+                    'required': True,
+                    'min_length': 10,
+                    'max_length': 1000000,  # 1MB max
+                    # No pattern validation for legacy code - it can contain any characters
+                },
+                'context': {
+                    'expected_type': str,
+                    'required': False,
+                    'max_length': 1000,
+                    'pattern': 'safe_string'
+                },
+                'audit_level': {
+                    'expected_type': int,
+                    'required': True,
+                    'min_value': 0,
+                    'max_value': 4,
+                    'allowed_values': [0, 1, 2, 3, 4]
+                }
+            }
+            
+            validated_params = self.validate_input(
+                parameters, 
+                validation_rules,
+                "business_rule_extraction"
+            )
+            
+            # Use validated parameters
+            legacy_code_snippet = validated_params['legacy_code_snippet']
+            context = validated_params['context']
+            audit_level = validated_params['audit_level']
+            
+        except Exception as validation_error:
+            # Handle validation error with standardized error handling
+            error_record = self.handle_error_standardized(
+                validation_error,
+                "input_parameter_validation",
+                request_id=request_id,
+                user_context={
+                    'code_length': len(legacy_code_snippet) if legacy_code_snippet else 0,
+                    'context_provided': context is not None,
+                    'audit_level_requested': audit_level
+                }
+            )
+            # Re-raise to prevent processing invalid input
+            raise validation_error
+
         user_id = "analyst_user" # Placeholder
         session_id = request_id
         ip_address = self.get_ip_address()
@@ -704,37 +764,63 @@ class BusinessRuleExtractionAgent(BaseAgent):
                 )
 
         except json.JSONDecodeError as e:
-            error_details = f"LLM response was not valid JSON: {e}. Raw response: {llm_response_raw}"
-            self.logger.error(error_details, request_id=request_id, exception=e)
-            self._log_exception_to_audit(request_id, e, "JSON_DECODE_ERROR", {
-                "raw_response": llm_response_raw[:500] if llm_response_raw else "None",
-                "tokens_processed": tokens_input + tokens_output,
-                "rules_extracted_before_error": len(extracted_rules)
-            }, "rule_extraction")
+            # Use standardized error handling
+            from Utils.error_handling import StandardErrorHandler, StandardErrorContext
+            context = StandardErrorContext(
+                operation="rule_extraction_json_parsing",
+                agent_name=self.__class__.__name__,
+                request_id=request_id,
+                user_context={
+                    "tokens_processed": tokens_input + tokens_output,
+                    "rules_extracted": len(extracted_rules)
+                },
+                system_context={
+                    "raw_response_length": len(llm_response_raw) if llm_response_raw else 0,
+                    "response_preview": llm_response_raw[:200] if llm_response_raw else "None"
+                }
+            )
+            error_handler = StandardErrorHandler(self.logger, self.audit_system)
+            error_record = error_handler.handle_error(e, context)
         except KeyboardInterrupt as e:
-            error_details = f"Processing interrupted by user"
-            self.logger.warning(error_details, request_id=request_id)
-            self._log_exception_to_audit(request_id, e, "USER_INTERRUPTION", {
-                "rules_extracted_before_interruption": len(extracted_rules),
-                "processing_stage": "rule_extraction"
-            }, "rule_extraction")
+            # Use standardized error handling for user interruption
+            from Utils.error_handling import StandardErrorHandler, StandardErrorContext
+            context = StandardErrorContext(
+                operation="rule_extraction_user_interruption", 
+                agent_name=self.__class__.__name__,
+                request_id=request_id,
+                user_context={"rules_extracted_before_interruption": len(extracted_rules)}
+            )
+            error_handler = StandardErrorHandler(self.logger, self.audit_system)
+            error_record = error_handler.handle_error(e, context)
         except TimeoutError as e:
-            error_details = f"Operation timed out: {e}"
-            self.logger.error(error_details, request_id=request_id, exception=e)
-            self._log_exception_to_audit(request_id, e, "TIMEOUT_ERROR", {
-                "timeout_duration": self.TOTAL_OPERATION_TIMEOUT,
-                "tokens_processed": tokens_input + tokens_output,
-                "rules_extracted_before_timeout": len(extracted_rules)
-            }, "rule_extraction")
+            # Use standardized error handling for timeouts
+            from Utils.error_handling import StandardErrorHandler, StandardErrorContext
+            context = StandardErrorContext(
+                operation="rule_extraction_timeout",
+                agent_name=self.__class__.__name__, 
+                request_id=request_id,
+                system_context={
+                    "timeout_duration": self.TOTAL_OPERATION_TIMEOUT,
+                    "tokens_processed": tokens_input + tokens_output,
+                    "rules_extracted": len(extracted_rules)
+                }
+            )
+            error_handler = StandardErrorHandler(self.logger, self.audit_system)
+            error_record = error_handler.handle_error(e, context)
         except Exception as e:
-            error_details = f"Unexpected error during rule extraction: {e}"
-            self.logger.error(error_details, request_id=request_id, exception=e)
-            self._log_exception_to_audit(request_id, e, "UNEXPECTED_ERROR", {
-                "exception_type": type(e).__name__,
-                "tokens_processed": tokens_input + tokens_output,
-                "rules_extracted_before_error": len(extracted_rules),
-                "processing_stage": "rule_extraction"
-            }, "rule_extraction")
+            # Use standardized error handling for unexpected errors
+            from Utils.error_handling import StandardErrorHandler, StandardErrorContext
+            context = StandardErrorContext(
+                operation="rule_extraction_unexpected_error",
+                agent_name=self.__class__.__name__,
+                request_id=request_id,
+                user_context={
+                    "tokens_processed": tokens_input + tokens_output,
+                    "rules_extracted": len(extracted_rules)
+                }
+            )
+            error_handler = StandardErrorHandler(self.logger, self.audit_system)
+            error_record = error_handler.handle_error(e, context)
 
         end_time = datetime.datetime.now(datetime.timezone.utc)
         duration_ms = (end_time - start_time).total_seconds() * 1000

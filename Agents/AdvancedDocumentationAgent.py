@@ -272,22 +272,56 @@ class AdvancedDocumentationAgent(RuleDocumentationGeneratorAgent):
             # Convert to Path object and resolve to absolute path
             path = Path(directory).resolve()
             
-            # If base path specified, ensure output is within allowed area
-            if base_allowed_path:
-                base_path = Path(base_allowed_path).resolve()
+            # Use standardized path validation for security
+            try:
+                # Validate path using enterprise-grade validation
+                validated_path = self.validate_file_path(
+                    directory,
+                    allowed_base_dirs=[base_allowed_path] if base_allowed_path else None,
+                    operation_context="output_directory_validation"
+                )
+                return validated_path
                 
-                # Check if the path is within the allowed base directory
-                try:
-                    path.relative_to(base_path)
-                except ValueError:
-                    # Path is outside the allowed directory
-                    sanitized_name = self._sanitize_path_component(Path(directory).name)
-                    path = base_path / sanitized_name
-                    
-            return path
+            except Exception as validation_error:
+                # Handle validation error with standardized error handling
+                error_context = {
+                    'original_directory': str(directory),
+                    'base_allowed_path': str(base_allowed_path) if base_allowed_path else None
+                }
+                
+                # Log security event using standardized audit trail
+                from Utils.audit_framework import AuditOutcome
+                self.log_immediate_event(
+                    operation_type="security_scan",
+                    operation_name="path_validation_failure",
+                    outcome=AuditOutcome.ERROR,
+                    result_summary=f"Path validation failed: {validation_error}",
+                    user_context=error_context,
+                    audit_level=1  # High priority for security issues
+                )
+                
+                self.handle_error_standardized(
+                    validation_error,
+                    "output_directory_validation",
+                    user_context=error_context
+                )
+                
+                # Create safe fallback path
+                safe_name = self._sanitize_path_component(str(directory))
+                if base_allowed_path:
+                    return Path(base_allowed_path) / safe_name
+                else:
+                    return Path("safe_documentation") / safe_name
             
         except (OSError, ValueError) as e:
-            # If path resolution fails, create a safe fallback
+            # Handle unexpected path errors with standardized error handling
+            self.handle_error_standardized(
+                e,
+                "output_directory_resolution", 
+                user_context={'directory': str(directory)}
+            )
+            
+            # Create safe fallback path
             safe_name = self._sanitize_path_component(str(directory))
             if base_allowed_path:
                 return Path(base_allowed_path) / safe_name
@@ -361,11 +395,14 @@ class AdvancedDocumentationAgent(RuleDocumentationGeneratorAgent):
             Dictionary with operation result
         """
         try:
-            with open(path_obj, 'w', encoding='utf-8') as f:
+            # Use managed file operation for automatic resource cleanup
+            from Utils.resource_managers import managed_file
+            
+            with managed_file(path_obj, 'w', encoding='utf-8') as f:
                 f.write(content)
             return {
                 "success": True,
-                "method": "standard_io",
+                "method": "managed_resource_io",
                 "file_path": str(path_obj),
                 "content_size": len(content),
                 "operation_time": TimeUtils.calculate_duration_ms(operation_start)
@@ -373,7 +410,7 @@ class AdvancedDocumentationAgent(RuleDocumentationGeneratorAgent):
         except Exception as e:
             return {
                 "success": False,
-                "method": "standard_io",
+                "method": "managed_resource_io",
                 "error": str(e),
                 "operation_time": TimeUtils.calculate_duration_ms(operation_start)
             }
@@ -506,7 +543,7 @@ class AdvancedDocumentationAgent(RuleDocumentationGeneratorAgent):
             'operation_metadata': {
                 'agent_id': self.agent_id,
                 'agent_name': self.agent_name,
-                'tool_integration': self.write_tool is not None,
+                'tool_integration': self.tools.has_write_tool(),
                 'timestamp': start_time.isoformat(),
                 'audit_level': audit_level
             }
@@ -634,7 +671,7 @@ class AdvancedDocumentationAgent(RuleDocumentationGeneratorAgent):
             'operation_metadata': {
                 'agent_id': self.agent_id,
                 'agent_name': self.agent_name,
-                'tool_integration': self.write_tool is not None,
+                'tool_integration': self.tools.has_write_tool(),
                 'timestamp': start_time.isoformat(),
                 'formats_requested': output_formats
             }

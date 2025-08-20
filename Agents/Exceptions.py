@@ -69,7 +69,7 @@ class ConfigurationError(AgentException):
     incompatible settings that prevent agent initialization or operation.
     """
     
-    def __init__(self, message: str, context: Optional[Dict[str, Any]] = None, request_id: Optional[str] = None):
+    def __init__(self, message: str, context: Optional[Dict[str, Any]] = None, request_id: Optional[str] = None) -> None:
         super().__init__(message, "CONFIG_ERROR", context, request_id)
 
 
@@ -81,7 +81,7 @@ class PIIProcessingError(AgentException):
     application, or tokenization/detokenization operations.
     """
     
-    def __init__(self, message: str, context: Optional[Dict[str, Any]] = None, request_id: Optional[str] = None):
+    def __init__(self, message: str, context: Optional[Dict[str, Any]] = None, request_id: Optional[str] = None) -> None:
         super().__init__(message, "PII_PROCESSING_ERROR", context, request_id)
 
 
@@ -93,7 +93,7 @@ class RuleExtractionError(AgentException):
     or output generation during the rule extraction process.
     """
     
-    def __init__(self, message: str, context: Optional[Dict[str, Any]] = None, request_id: Optional[str] = None):
+    def __init__(self, message: str, context: Optional[Dict[str, Any]] = None, request_id: Optional[str] = None) -> None:
         super().__init__(message, "RULE_EXTRACTION_ERROR", context, request_id)
 
 
@@ -105,7 +105,7 @@ class TriageProcessingError(AgentException):
     execution, or decision generation during the triage process.
     """
     
-    def __init__(self, message: str, context: Optional[Dict[str, Any]] = None, request_id: Optional[str] = None):
+    def __init__(self, message: str, context: Optional[Dict[str, Any]] = None, request_id: Optional[str] = None) -> None:
         super().__init__(message, "TRIAGE_PROCESSING_ERROR", context, request_id)
 
 
@@ -117,7 +117,7 @@ class DocumentationError(AgentException):
     operations, or template processing during documentation creation.
     """
     
-    def __init__(self, message: str, context: Optional[Dict[str, Any]] = None, request_id: Optional[str] = None):
+    def __init__(self, message: str, context: Optional[Dict[str, Any]] = None, request_id: Optional[str] = None) -> None:
         super().__init__(message, "DOCUMENTATION_ERROR", context, request_id)
 
 
@@ -129,7 +129,7 @@ class AuditingError(AgentException):
     validation that don't prevent main operation but affect audit trail.
     """
     
-    def __init__(self, message: str, context: Optional[Dict[str, Any]] = None, request_id: Optional[str] = None):
+    def __init__(self, message: str, context: Optional[Dict[str, Any]] = None, request_id: Optional[str] = None) -> None:
         super().__init__(message, "AUDITING_ERROR", context, request_id)
 
 
@@ -141,7 +141,7 @@ class APITimeoutError(AgentException):
     failures that can be retried with appropriate backoff strategies.
     """
     
-    def __init__(self, message: str, context: Optional[Dict[str, Any]] = None, request_id: Optional[str] = None):
+    def __init__(self, message: str, context: Optional[Dict[str, Any]] = None, request_id: Optional[str] = None) -> None:
         super().__init__(message, "API_TIMEOUT_ERROR", context, request_id)
 
 
@@ -153,7 +153,7 @@ class ValidationError(AgentException):
     required specifications or constraints for proper agent operation.
     """
     
-    def __init__(self, message: str, context: Optional[Dict[str, Any]] = None, request_id: Optional[str] = None):
+    def __init__(self, message: str, context: Optional[Dict[str, Any]] = None, request_id: Optional[str] = None) -> None:
         super().__init__(message, "VALIDATION_ERROR", context, request_id)
 
 
@@ -165,7 +165,7 @@ class ToolIntegrationError(AgentException):
     or tool unavailability that affects enhanced agent functionality.
     """
     
-    def __init__(self, message: str, context: Optional[Dict[str, Any]] = None, request_id: Optional[str] = None):
+    def __init__(self, message: str, context: Optional[Dict[str, Any]] = None, request_id: Optional[str] = None) -> None:
         super().__init__(message, "TOOL_INTEGRATION_ERROR", context, request_id)
 
 

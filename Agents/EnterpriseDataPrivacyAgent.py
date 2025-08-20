@@ -386,27 +386,29 @@ class EnterpriseDataPrivacyAgent(PersonalDataProtectionAgent):
                     self.logger.debug(f"File read using Read tool: {len(file_content)} characters", request_id=request_id)
                 except Exception as e:
                     self.logger.warning(f"Read tool failed, using standard file I/O: {e}", request_id=request_id)
-                    # Fallback to standard file reading with encoding handling
+                    # Fallback to managed file reading with encoding handling
+                    from Utils.resource_managers import managed_file
                     try:
-                        with open(file_path, 'r', encoding='utf-8') as f:
+                        with managed_file(file_path, 'r', encoding='utf-8') as f:
                             file_content = f.read()
-                        read_method = "standard_io_fallback_utf8"
+                        read_method = "managed_io_fallback_utf8"
                     except UnicodeDecodeError:
                         # Try alternative encodings for legacy files
-                        with open(file_path, 'r', encoding='latin1') as f:
+                        with managed_file(file_path, 'r', encoding='latin1') as f:
                             file_content = f.read()
-                        read_method = "standard_io_fallback_latin1"
+                        read_method = "managed_io_fallback_latin1"
             else:
-                # Use standard file reading with robust encoding
+                # Use managed file reading with robust encoding
+                from Utils.resource_managers import managed_file
                 try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
+                    with managed_file(file_path, 'r', encoding='utf-8') as f:
                         file_content = f.read()
-                    read_method = "standard_io_utf8"
+                    read_method = "managed_io_utf8"
                 except UnicodeDecodeError:
                     # Handle legacy files with alternative encoding
-                    with open(file_path, 'r', encoding='latin1') as f:
+                    with managed_file(file_path, 'r', encoding='latin1') as f:
                         file_content = f.read()
-                    read_method = "standard_io_latin1"
+                    read_method = "managed_io_latin1"
             
             # Enhanced file metadata with memory optimization info
             file_metadata = {
@@ -613,7 +615,7 @@ class EnterpriseDataPrivacyAgent(PersonalDataProtectionAgent):
     def scrub_large_file_streaming(self, file_path: str, context: str = "general", 
                                   masking_strategy: MaskingStrategy = MaskingStrategy.PARTIAL_MASK,
                                   audit_level: int = AuditLevel.LEVEL_2.value,
-                                  chunk_size_mb: int = 1) -> Dict[str, Any]:
+                                  chunk_size_mb: int = None) -> Dict[str, Any]:
         """
         Process large files (>10MB) using streaming chunks for memory efficiency.
         
@@ -625,11 +627,14 @@ class EnterpriseDataPrivacyAgent(PersonalDataProtectionAgent):
             context: Context for PII detection (financial, healthcare, etc.)
             masking_strategy: Strategy for masking detected PII
             audit_level: Audit verbosity level
-            chunk_size_mb: Size of each processing chunk in MB (default: 1MB)
+            chunk_size_mb: Size of each processing chunk in MB (uses config if None)
             
         Returns:
             Dictionary with streaming processing results and performance metrics
         """
+        # Get configuration value for chunk size
+        processing_config = self.agent_config.get('processing_limits', {})
+        chunk_size_mb = chunk_size_mb or processing_config.get('chunk_size_mb', 1)
         request_id = f"stream-pii-{uuid.uuid4().hex[:12]}"
         start_time = datetime.datetime.now(datetime.timezone.utc)
         

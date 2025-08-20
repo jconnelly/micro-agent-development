@@ -19,39 +19,103 @@ class AgentLogger:
     1 = ON (development mode - all messages to console)
     """
     
-    def __init__(self, log_level: int = 0, agent_name: str = "Agent"):
+    def __init__(self, log_level: int = 0, agent_name: str = "Agent", config: Dict[str, Any] = None) -> None:
         """
         Initialize the logger.
         
         Args:
             log_level: 0 = OFF (production), 1 = ON (development)
             agent_name: Name of the agent for log prefixes
+            config: Configuration dictionary containing processing_limits settings
         """
         self.log_level = log_level
         self.agent_name = agent_name
         self.session_logs = []  # Store logs in memory for audit trail
+        self.config = config or {}
     
     def _sanitize_message(self, message: str) -> str:
         """
-        Sanitize log message to prevent injection attacks.
-        Removes control characters, escape sequences, and other potentially dangerous characters.
+        Enhanced sanitization to prevent comprehensive log injection attacks.
+        Removes control characters, escape sequences, injection patterns, and other dangerous content.
         """
         if not isinstance(message, str):
             message = str(message)
         
-        # Remove control characters (except newline and tab for readability)
+        # Remove all control characters (including null bytes, backspace, etc.)
         message = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]', '', message)
         
         # Remove ANSI escape sequences (color codes, cursor movement, etc.)
         message = re.sub(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', message)
         
-        # Limit message length to prevent log flooding
-        max_length = 2000
-        if len(message) > max_length:
-            message = message[:max_length] + "... [TRUNCATED]"
+        # Remove log injection patterns that could confuse log parsers
+        injection_patterns = [
+            r'%[0-9a-fA-F]{2}',              # URL encoded characters
+            r'\\[nrtfbav\\]',                # Escape sequences
+            r'\$\{[^}]*\}',                  # Variable substitution patterns
+            r'<%[^>]*%>',                    # Template injection patterns
+            r'\{\{[^}]*\}\}',                # Template engine patterns
+            r'javascript:',                   # JavaScript protocol
+            r'data:',                        # Data URI scheme
+            r'vbscript:',                    # VBScript protocol
+            r'<script[^>]*>.*?</script>',    # Script tags
+            r'<iframe[^>]*>.*?</iframe>',    # Iframe tags
+            r'on\w+\s*=',                    # Event handlers (onclick, onload, etc.)
+            r'expression\s*\(',             # CSS expression
+            r'eval\s*\(',                   # Eval function
+            r'alert\s*\(',                  # Alert function
+            r'document\.',                   # Document object access
+            r'window\.',                     # Window object access
+            r'location\.',                   # Location object access
+            r'\.innerHTML',                  # InnerHTML property
+            r'\.outerHTML',                  # OuterHTML property
+        ]
         
-        # Replace newlines with spaces to prevent log format confusion
+        # Apply each injection pattern filter
+        for pattern in injection_patterns:
+            message = re.sub(pattern, '[FILTERED]', message, flags=re.IGNORECASE)
+        
+        # Remove potential SQL injection patterns
+        sql_patterns = [
+            r"'[^']*';?\s*(union|select|insert|update|delete|drop|create|alter|exec|execute)",
+            r'"[^"]*";?\s*(union|select|insert|update|delete|drop|create|alter|exec|execute)',
+            r'\b(union|select|insert|update|delete|drop|create|alter|exec|execute)\b.*(\bfrom\b|\binto\b|\bset\b|\bwhere\b)',
+            r'--\s',                         # SQL comments
+            r'/\*.*?\*/',                    # Multi-line SQL comments
+            r'\bor\b\s+\d+\s*=\s*\d+',     # OR 1=1 type injections
+            r'\band\b\s+\d+\s*=\s*\d+',    # AND 1=1 type injections
+        ]
+        
+        for pattern in sql_patterns:
+            message = re.sub(pattern, '[SQL_FILTERED]', message, flags=re.IGNORECASE | re.DOTALL)
+        
+        # Remove path traversal attempts
+        message = re.sub(r'\.\.[\\/]', '[PATH_FILTERED]', message)
+        message = re.sub(r'[\\/]etc[\\/]', '[PATH_FILTERED]', message)
+        message = re.sub(r'[\\/]proc[\\/]', '[PATH_FILTERED]', message)
+        message = re.sub(r'[\\/]var[\\/]log', '[PATH_FILTERED]', message)
+        
+        # Remove potential command injection patterns
+        command_patterns = [
+            r'[;&|`]',                       # Command separators and backticks
+            r'\$\([^)]*\)',                  # Command substitution
+            r'`[^`]*`',                      # Backtick command execution
+            r'\|\s*(cat|ls|ps|id|whoami|uname|pwd|echo|grep|find|which)',  # Piped commands
+        ]
+        
+        for pattern in command_patterns:
+            message = re.sub(pattern, '[CMD_FILTERED]', message, flags=re.IGNORECASE)
+        
+        # Limit message length to prevent log flooding attacks (from config)
+        processing_limits = self.config.get('processing_limits', {})
+        max_length = processing_limits.get('max_log_message_length', 2000)
+        if len(message) > max_length:
+            message = message[:max_length] + "... [TRUNCATED_FOR_SECURITY]"
+        
+        # Replace newlines and carriage returns to prevent log format confusion
         message = message.replace('\n', ' ').replace('\r', ' ')
+        
+        # Remove excessive whitespace that could be used for obfuscation
+        message = re.sub(r'\s+', ' ', message).strip()
         
         return message
     
