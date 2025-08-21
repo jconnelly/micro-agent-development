@@ -177,6 +177,19 @@ class EnterpriseDataPrivacyAgent(PersonalDataProtectionAgent):
         self.grep_tool = grep_tool
         self.read_tool = read_tool
         
+        # Initialize concurrent processing capabilities
+        try:
+            from ..Utils.concurrent_processor import ConcurrentProcessor
+            self._concurrent_processor = ConcurrentProcessor(
+                max_workers=None,  # Auto-detect optimal workers
+                enable_monitoring=True,
+                enable_adaptive_sizing=True
+            )
+            self._concurrent_processing_enabled = True
+        except ImportError:
+            self._concurrent_processor = None
+            self._concurrent_processing_enabled = False
+        
     def get_agent_info(self) -> Dict[str, Any]:
         """Get agent information including tool integration capabilities."""
         base_info = super().get_agent_info()
@@ -185,14 +198,18 @@ class EnterpriseDataPrivacyAgent(PersonalDataProtectionAgent):
                 "grep_tool": self.grep_tool is not None,
                 "read_tool": self.read_tool is not None,
                 "large_document_support": True,
-                "performance_optimized": True
+                "performance_optimized": True,
+                "concurrent_processing": self._concurrent_processing_enabled
             },
             "capabilities": base_info.get("capabilities", []) + [
                 "high_performance_pattern_matching",
                 "large_document_processing",
                 "multi_format_file_support",
                 "batch_file_processing",
-                "performance_metrics"
+                "performance_metrics",
+                "concurrent_pii_detection",
+                "parallel_file_processing",
+                "multi_core_utilization"
             ]
         })
         return base_info
@@ -1135,5 +1152,197 @@ class EnterpriseDataPrivacyAgent(PersonalDataProtectionAgent):
                 'success': False,
                 'error': str(e),
                 'processing_method': 'dynamic_batch_optimized',
+                'duration_ms': error_duration
+            }
+
+    def concurrent_process_files(self, file_paths: List[str], context: str = "general",
+                               masking_strategy: MaskingStrategy = MaskingStrategy.PARTIAL_MASK,
+                               audit_level: int = AuditLevel.LEVEL_2.value,
+                               max_workers: Optional[int] = None) -> Dict[str, Any]:
+        """
+        Process multiple files concurrently using ThreadPoolExecutor for multi-core utilization.
+        
+        This method implements Task 7: Concurrent processing pipeline achieving multi-core
+        performance improvements through parallel file processing.
+        
+        Args:
+            file_paths: List of file paths to process concurrently
+            context: Context for PII detection
+            masking_strategy: Strategy for masking detected PII
+            audit_level: Audit verbosity level
+            max_workers: Maximum number of concurrent worker threads (auto-detected if None)
+            
+        Returns:
+            Dictionary with concurrent processing results and performance metrics
+        """
+        if not self._concurrent_processing_enabled:
+            self.logger.warning("Concurrent processing not available, falling back to batch processing")
+            return self.batch_process_files_optimized(file_paths, context, masking_strategy, audit_level)
+        
+        request_id = f"concurrent-pii-{uuid.uuid4().hex[:12]}"
+        start_time = datetime.datetime.now(datetime.timezone.utc)
+        
+        try:
+            self.logger.info(f"Starting concurrent PII processing for {len(file_paths)} files with "
+                           f"max_workers={max_workers or 'auto'}", request_id=request_id)
+            
+            # Define file processing function for concurrent execution
+            def process_single_file_concurrent(file_path: str) -> Tuple[str, Dict[str, Any]]:
+                """Process a single file for concurrent execution."""
+                file_start_time = datetime.datetime.now(datetime.timezone.utc)
+                
+                try:
+                    # Use enhanced processing method
+                    file_result = self.scrub_file_enhanced_processing(
+                        file_path=file_path,
+                        context=context,
+                        masking_strategy=masking_strategy,
+                        audit_level=audit_level + 1,  # Reduce verbosity for concurrent processing
+                        request_id=request_id
+                    )
+                    
+                    # Add thread-specific timing
+                    processing_duration = (datetime.datetime.now(datetime.timezone.utc) - file_start_time).total_seconds() * 1000
+                    file_result['thread_processing_time_ms'] = processing_duration
+                    
+                    return file_path, file_result
+                    
+                except Exception as e:
+                    error_duration = (datetime.datetime.now(datetime.timezone.utc) - file_start_time).total_seconds() * 1000
+                    return file_path, {
+                        'success': False,
+                        'error': str(e),
+                        'file_path': file_path,
+                        'thread_processing_time_ms': error_duration
+                    }
+            
+            # Configure concurrent processor
+            if max_workers:
+                self._concurrent_processor.max_workers = max_workers
+            
+            # Process files concurrently using the concurrent processor
+            with self._concurrent_processor as processor:
+                file_results = processor.process_files_concurrent(
+                    file_paths=file_paths,
+                    file_processor=lambda file_path: process_single_file_concurrent(file_path)[1]  # Extract result only
+                )
+                
+                # Get performance summary
+                performance_summary = processor.get_performance_summary()
+                error_summary = processor.get_error_summary()
+            
+            # Aggregate results and calculate metrics
+            total_metrics = {
+                'files_processed': len(file_results),
+                'files_successful': 0,
+                'files_failed': 0,
+                'total_pii_instances': 0,
+                'total_file_size_mb': 0.0,
+                'total_thread_time_ms': 0.0,
+                'processing_errors': error_summary.get('total_errors', 0)
+            }
+            
+            # Process results and calculate aggregated metrics
+            for file_path, file_result in file_results.items():
+                if isinstance(file_result, dict) and file_result.get('success', False):
+                    total_metrics['files_successful'] += 1
+                    total_metrics['total_pii_instances'] += file_result.get('pii_instances_found', 0)
+                    total_metrics['total_file_size_mb'] += file_result.get('file_size_mb', 0)
+                    total_metrics['total_thread_time_ms'] += file_result.get('thread_processing_time_ms', 0)
+                else:
+                    total_metrics['files_failed'] += 1
+                    if isinstance(file_result, dict):
+                        total_metrics['total_thread_time_ms'] += file_result.get('thread_processing_time_ms', 0)
+            
+            # Calculate final timing and efficiency metrics
+            total_duration = (datetime.datetime.now(datetime.timezone.utc) - start_time).total_seconds() * 1000
+            
+            # Calculate parallelization efficiency
+            parallelization_efficiency = 0.0
+            if total_metrics['total_thread_time_ms'] > 0 and total_duration > 0:
+                parallelization_efficiency = min(
+                    (total_metrics['total_thread_time_ms'] / total_duration) * 100,
+                    100.0
+                )
+            
+            # Extract performance metrics from concurrent processor
+            proc_summary = performance_summary.get('processing_summary', {})
+            concurrency_summary = performance_summary.get('concurrency_summary', {})
+            resource_summary = performance_summary.get('resource_summary', {})
+            
+            # Audit the concurrent operation
+            audit_data = {
+                'request_id': request_id,
+                'total_files': len(file_paths),
+                'files_successful': total_metrics['files_successful'],
+                'files_failed': total_metrics['files_failed'],
+                'total_pii_instances': total_metrics['total_pii_instances'],
+                'total_file_size_mb': total_metrics['total_file_size_mb'],
+                'total_duration_ms': total_duration,
+                'parallelization_efficiency_percent': parallelization_efficiency,
+                'worker_utilization_percent': concurrency_summary.get('worker_utilization_percent', 0),
+                'max_workers_used': concurrency_summary.get('max_workers', 0),
+                'throughput_tasks_per_second': proc_summary.get('throughput_tasks_per_second', 0),
+                'concurrent_processing': True
+            }
+            
+            if audit_level <= AuditLevel.LEVEL_3.value:
+                self.audit_system.log_agent_activity(
+                    agent_name="EnterpriseDataPrivacyAgent",
+                    operation="concurrent_file_pii_processing",
+                    outcome="success" if total_metrics['files_failed'] == 0 else "partial_success",
+                    **audit_data
+                )
+            
+            self.logger.info(f"Concurrent processing complete - Files: {total_metrics['files_successful']}/{len(file_paths)}, "
+                           f"PII: {total_metrics['total_pii_instances']} instances, "
+                           f"Duration: {total_duration:.1f}ms, "
+                           f"Parallelization efficiency: {parallelization_efficiency:.1f}%, "
+                           f"Workers: {concurrency_summary.get('max_workers', 0)}, "
+                           f"Throughput: {proc_summary.get('throughput_tasks_per_second', 0):.1f} files/sec",
+                           request_id=request_id)
+            
+            return {
+                'request_id': request_id,
+                'success': True,
+                'processing_method': 'concurrent_multi_core',
+                'file_results': file_results,
+                'concurrent_metrics': total_metrics,
+                'performance_summary': performance_summary,
+                'parallelization_metrics': {
+                    'total_thread_time_ms': total_metrics['total_thread_time_ms'],
+                    'wall_clock_time_ms': total_duration,
+                    'parallelization_efficiency_percent': parallelization_efficiency,
+                    'theoretical_speedup': total_metrics['total_thread_time_ms'] / max(total_duration, 1),
+                    'worker_utilization_percent': concurrency_summary.get('worker_utilization_percent', 0),
+                    'peak_active_tasks': concurrency_summary.get('peak_active_tasks', 0)
+                },
+                'resource_utilization': {
+                    'max_workers': concurrency_summary.get('max_workers', 0),
+                    'system_cores': resource_summary.get('system_cores', 0),
+                    'memory_usage_mb': resource_summary.get('memory_usage_mb', 0),
+                    'cpu_usage_percent': resource_summary.get('cpu_usage_percent', 0)
+                },
+                'optimization_achieved': {
+                    'concurrent_processing': True,
+                    'multi_core_utilization': True,
+                    'adaptive_worker_sizing': concurrency_summary.get('adaptive_sizing_enabled', False),
+                    'performance_monitoring': True,
+                    'parallelization_efficiency_percent': parallelization_efficiency,
+                    'expected_improvement': 'Multi-core performance scaling based on system resources'
+                },
+                'optimization_insights': performance_summary.get('optimization_insights', []),
+                'total_duration_ms': total_duration
+            }
+            
+        except Exception as e:
+            error_duration = (datetime.datetime.now(datetime.timezone.utc) - start_time).total_seconds() * 1000
+            self.logger.error(f"Concurrent processing failed: {e}", request_id=request_id)
+            
+            return {
+                'request_id': request_id,
+                'success': False,
+                'error': str(e),
+                'processing_method': 'concurrent_multi_core',
                 'duration_ms': error_duration
             }

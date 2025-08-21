@@ -131,6 +131,19 @@ class BusinessRuleExtractionAgent(BaseAgent):
             'average_rules_per_file': 0.0
         }
         
+        # Initialize concurrent processing capabilities
+        try:
+            from ..Utils.concurrent_processor import ConcurrentProcessor
+            self._concurrent_processor = ConcurrentProcessor(
+                max_workers=None,  # Auto-detect optimal workers
+                enable_monitoring=True,
+                enable_adaptive_sizing=True
+            )
+            self._concurrent_processing_enabled = True
+        except ImportError:
+            self._concurrent_processor = None
+            self._concurrent_processing_enabled = False
+        
         # Audit initial setup
         self.audit_system.log_agent_action(
             agent_id=self.agent_id,
@@ -419,7 +432,10 @@ class BusinessRuleExtractionAgent(BaseAgent):
                 "intelligent_chunking",
                 "real_time_completeness_analysis",
                 "modular_processing",
-                "parallel_optimization"
+                "parallel_optimization",
+                "concurrent_processing",
+                "multi_core_utilization",
+                "parallel_rule_extraction"
             ],
             "supported_languages": [
                 "COBOL", "Java", "C/C++", "PL/SQL", "Visual Basic", 
@@ -436,7 +452,10 @@ class BusinessRuleExtractionAgent(BaseAgent):
                 "Parallel processing capability", 
                 "Better caching efficiency",
                 "Component-specific optimization",
-                "Enhanced maintainability"
+                "Enhanced maintainability",
+                "Concurrent rule extraction",
+                "Multi-core utilization",
+                f"ThreadPool processing {'enabled' if self._concurrent_processing_enabled else 'disabled'}"
             ],
             "business_domains": [
                 "financial_services", "insurance", "healthcare", 
@@ -448,3 +467,222 @@ class BusinessRuleExtractionAgent(BaseAgent):
             ],
             "processing_statistics": self.get_processing_statistics()
         }
+
+    def extract_rules_from_multiple_files_concurrent(self, file_paths: List[str], 
+                                                   context: str = "legacy_modernization",
+                                                   max_workers: Optional[int] = None) -> Dict[str, Any]:
+        """
+        Extract business rules from multiple files concurrently using ThreadPoolExecutor.
+        
+        This method implements Task 7: Concurrent processing pipeline achieving multi-core
+        performance improvements through parallel rule extraction across multiple files.
+        
+        Args:
+            file_paths: List of file paths containing legacy code for rule extraction
+            context: Business context for rule extraction
+            max_workers: Maximum number of concurrent worker threads (auto-detected if None)
+            
+        Returns:
+            Dictionary with concurrent processing results and comprehensive metrics
+        """
+        if not self._concurrent_processing_enabled:
+            self.log_info("Concurrent processing not available, processing files sequentially")
+            # Fallback to sequential processing
+            results = {}
+            for file_path in file_paths:
+                try:
+                    results[file_path] = self.extract_business_rules(file_path, context)
+                except Exception as e:
+                    results[file_path] = {"success": False, "error": str(e)}
+            return {"file_results": results, "concurrent_processing": False}
+        
+        request_id = f"concurrent-rules-{uuid.uuid4().hex[:12]}"
+        start_time = datetime.datetime.now()
+        
+        try:
+            self.log_info(f"Starting concurrent rule extraction for {len(file_paths)} files with "
+                         f"max_workers={max_workers or 'auto'}")
+            
+            # Define rule extraction function for concurrent execution
+            def extract_rules_from_single_file(file_path: str) -> Tuple[str, Dict[str, Any]]:
+                """Extract rules from a single file for concurrent execution."""
+                file_start_time = datetime.datetime.now()
+                
+                try:
+                    # Use main rule extraction method
+                    extraction_result = self.extract_business_rules(file_path, context)
+                    
+                    # Add thread-specific timing
+                    processing_duration = (datetime.datetime.now() - file_start_time).total_seconds() * 1000
+                    extraction_result['thread_processing_time_ms'] = processing_duration
+                    
+                    return file_path, extraction_result
+                    
+                except Exception as e:
+                    error_duration = (datetime.datetime.now() - file_start_time).total_seconds() * 1000
+                    return file_path, {
+                        'success': False,
+                        'error': str(e),
+                        'file_path': file_path,
+                        'thread_processing_time_ms': error_duration,
+                        'rules_extracted': []
+                    }
+            
+            # Configure concurrent processor
+            if max_workers:
+                self._concurrent_processor.max_workers = max_workers
+            
+            # Process files concurrently using the concurrent processor
+            with self._concurrent_processor as processor:
+                file_results = processor.process_files_concurrent(
+                    file_paths=file_paths,
+                    file_processor=lambda file_path: extract_rules_from_single_file(file_path)[1]  # Extract result only
+                )
+                
+                # Get performance summary
+                performance_summary = processor.get_performance_summary()
+                error_summary = processor.get_error_summary()
+            
+            # Aggregate results and calculate metrics
+            total_metrics = {
+                'files_processed': len(file_results),
+                'files_successful': 0,
+                'files_failed': 0,
+                'total_rules_extracted': 0,
+                'total_thread_time_ms': 0.0,
+                'processing_errors': error_summary.get('total_errors', 0),
+                'rules_by_category': {},
+                'languages_detected': set()
+            }
+            
+            # Process results and calculate aggregated metrics
+            for file_path, extraction_result in file_results.items():
+                if isinstance(extraction_result, dict) and extraction_result.get('success', False):
+                    total_metrics['files_successful'] += 1
+                    
+                    # Count rules
+                    rules_extracted = extraction_result.get('rules_extracted', [])
+                    total_metrics['total_rules_extracted'] += len(rules_extracted)
+                    
+                    # Categorize rules
+                    for rule in rules_extracted:
+                        if isinstance(rule, dict) and 'category' in rule:
+                            category = rule['category']
+                            total_metrics['rules_by_category'][category] = total_metrics['rules_by_category'].get(category, 0) + 1
+                    
+                    # Track languages
+                    language = extraction_result.get('language_detected', 'unknown')
+                    total_metrics['languages_detected'].add(language)
+                    
+                    # Accumulate processing time
+                    total_metrics['total_thread_time_ms'] += extraction_result.get('thread_processing_time_ms', 0)
+                else:
+                    total_metrics['files_failed'] += 1
+                    if isinstance(extraction_result, dict):
+                        total_metrics['total_thread_time_ms'] += extraction_result.get('thread_processing_time_ms', 0)
+            
+            # Calculate final timing and efficiency metrics
+            total_duration = (datetime.datetime.now() - start_time).total_seconds() * 1000
+            
+            # Calculate parallelization efficiency
+            parallelization_efficiency = 0.0
+            if total_metrics['total_thread_time_ms'] > 0 and total_duration > 0:
+                parallelization_efficiency = min(
+                    (total_metrics['total_thread_time_ms'] / total_duration) * 100,
+                    100.0
+                )
+            
+            # Extract performance metrics from concurrent processor
+            proc_summary = performance_summary.get('processing_summary', {})
+            concurrency_summary = performance_summary.get('concurrency_summary', {})
+            resource_summary = performance_summary.get('resource_summary', {})
+            
+            # Convert set to list for JSON serialization
+            total_metrics['languages_detected'] = list(total_metrics['languages_detected'])
+            
+            # Update processing statistics
+            self._processing_stats['total_files_processed'] += total_metrics['files_successful']
+            self._processing_stats['total_rules_extracted'] += total_metrics['total_rules_extracted']
+            self._processing_stats['total_processing_time'] += total_duration
+            if self._processing_stats['total_files_processed'] > 0:
+                self._processing_stats['average_rules_per_file'] = (
+                    self._processing_stats['total_rules_extracted'] / self._processing_stats['total_files_processed']
+                )
+            
+            # Audit the concurrent operation
+            self.audit_system.log_agent_action(
+                agent_id=self.agent_id,
+                action="concurrent_rule_extraction",
+                details={
+                    'request_id': request_id,
+                    'total_files': len(file_paths),
+                    'files_successful': total_metrics['files_successful'],
+                    'files_failed': total_metrics['files_failed'],
+                    'total_rules_extracted': total_metrics['total_rules_extracted'],
+                    'total_duration_ms': total_duration,
+                    'parallelization_efficiency_percent': parallelization_efficiency,
+                    'worker_utilization_percent': concurrency_summary.get('worker_utilization_percent', 0),
+                    'max_workers_used': concurrency_summary.get('max_workers', 0),
+                    'throughput_files_per_second': proc_summary.get('throughput_tasks_per_second', 0),
+                    'concurrent_processing': True,
+                    'context': context
+                }
+            )
+            
+            self.log_info(f"Concurrent rule extraction complete - Files: {total_metrics['files_successful']}/{len(file_paths)}, "
+                         f"Rules: {total_metrics['total_rules_extracted']} extracted, "
+                         f"Duration: {total_duration:.1f}ms, "
+                         f"Parallelization efficiency: {parallelization_efficiency:.1f}%, "
+                         f"Workers: {concurrency_summary.get('max_workers', 0)}, "
+                         f"Throughput: {proc_summary.get('throughput_tasks_per_second', 0):.1f} files/sec")
+            
+            return {
+                'request_id': request_id,
+                'success': True,
+                'processing_method': 'concurrent_multi_core',
+                'file_results': file_results,
+                'concurrent_metrics': total_metrics,
+                'performance_summary': performance_summary,
+                'parallelization_metrics': {
+                    'total_thread_time_ms': total_metrics['total_thread_time_ms'],
+                    'wall_clock_time_ms': total_duration,
+                    'parallelization_efficiency_percent': parallelization_efficiency,
+                    'theoretical_speedup': total_metrics['total_thread_time_ms'] / max(total_duration, 1),
+                    'worker_utilization_percent': concurrency_summary.get('worker_utilization_percent', 0),
+                    'peak_active_tasks': concurrency_summary.get('peak_active_tasks', 0)
+                },
+                'resource_utilization': {
+                    'max_workers': concurrency_summary.get('max_workers', 0),
+                    'system_cores': resource_summary.get('system_cores', 0),
+                    'memory_usage_mb': resource_summary.get('memory_usage_mb', 0),
+                    'cpu_usage_percent': resource_summary.get('cpu_usage_percent', 0)
+                },
+                'rule_extraction_summary': {
+                    'total_rules_extracted': total_metrics['total_rules_extracted'],
+                    'rules_by_category': total_metrics['rules_by_category'],
+                    'languages_detected': total_metrics['languages_detected'],
+                    'average_rules_per_file': total_metrics['total_rules_extracted'] / max(total_metrics['files_successful'], 1)
+                },
+                'optimization_achieved': {
+                    'concurrent_processing': True,
+                    'multi_core_utilization': True,
+                    'adaptive_worker_sizing': concurrency_summary.get('adaptive_sizing_enabled', False),
+                    'performance_monitoring': True,
+                    'parallelization_efficiency_percent': parallelization_efficiency,
+                    'expected_improvement': 'Multi-core performance scaling based on system resources'
+                },
+                'optimization_insights': performance_summary.get('optimization_insights', []),
+                'total_duration_ms': total_duration
+            }
+            
+        except Exception as e:
+            error_duration = (datetime.datetime.now() - start_time).total_seconds() * 1000
+            self.log_error(f"Concurrent rule extraction failed: {e}")
+            
+            return {
+                'request_id': request_id,
+                'success': False,
+                'error': str(e),
+                'processing_method': 'concurrent_multi_core',
+                'duration_ms': error_duration
+            }
