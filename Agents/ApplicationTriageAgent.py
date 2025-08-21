@@ -2,6 +2,7 @@ import json
 import datetime
 import time
 import asyncio
+import uuid
 from typing import Dict, Any, Optional, List
 
 # Import other Agents from current location, change package location if moved
@@ -182,7 +183,7 @@ class ApplicationTriageAgent(BaseAgent):
                 audit_system=audit_system,
                 context=PIIContext.FINANCIAL,  # Financial context for loan/credit applications
                 log_level=log_level,
-                enable_tokenization=(pii_masking_strategy == MaskingStrategy.TOKENIZE)
+                default_strategy=pii_masking_strategy
             )
             self.pii_masking_strategy = pii_masking_strategy
         else:

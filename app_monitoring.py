@@ -17,6 +17,16 @@ import json
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Load performance configuration
+try:
+    from Utils.config_loader import load_config
+    performance_config = load_config('agent_defaults', {}).get('agent_defaults', {}).get('performance_thresholds', {})
+except Exception:
+    # Fallback configuration if config loading fails
+    performance_config = {
+        'performance_sample_limit': 1000
+    }
+
 class APMMetrics:
     """Application Performance Monitoring Metrics Collection"""
     
@@ -184,8 +194,9 @@ class APMMetrics:
                 'status_code': status_code
             })
             
-            # Keep only last 1000 entries
-            if len(self._performance_data['request_times']) > 1000:
+            # Keep only configurable number of entries
+            sample_limit = performance_config.get('performance_sample_limit', 1000)
+            if len(self._performance_data['request_times']) > sample_limit:
                 self._performance_data['request_times'].popleft()
     
     def record_agent_operation(self, agent_type: str, operation: str, 

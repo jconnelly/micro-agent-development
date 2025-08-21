@@ -641,8 +641,8 @@ class RuleDocumentationGeneratorAgent(BaseAgent):
                 "healthcare", "ecommerce", "general"
             ],
             "configuration": {
-                "api_timeout_seconds": self.API_TIMEOUT_SECONDS,
-                "max_retries": self.MAX_RETRIES,
+                "api_timeout_seconds": getattr(self, 'API_TIMEOUT_SECONDS', 30),
+                "max_retries": getattr(self, 'MAX_RETRIES', 3),
                 "default_format": "markdown"
             }
         }

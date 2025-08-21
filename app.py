@@ -59,16 +59,26 @@ except ImportError as e:
 # Initialize Flask application
 app = Flask(__name__)
 
-# Load configuration for Flask settings
+# Load configuration for Flask settings and performance thresholds
 try:
     from Utils.config_loader import load_config
-    flask_config = load_config('agent_defaults', {}).get('agent_defaults', {}).get('flask_settings', {})
+    config_data = load_config('agent_defaults', {}).get('agent_defaults', {})
+    flask_config = config_data.get('flask_settings', {})
+    performance_config = config_data.get('performance_thresholds', {})
+    model_config = config_data.get('model_defaults', {})
 except Exception:
     # Fallback configuration if config loading fails
     flask_config = {
         'max_content_length_mb': 16,
         'json_sort_keys': False,
         'jsonify_prettyprint': False
+    }
+    performance_config = {
+        'max_legacy_code_bytes': 1048576,  # 1MB
+        'batch_size_limit': 10000
+    }
+    model_config = {
+        'max_input_tokens': 8192
     }
 
 # Configure Flask for production
@@ -296,7 +306,14 @@ def validate_json_request(required_fields: List[str] = None) -> Dict[str, Any]:
     if required_fields:
         missing_fields = [field for field in required_fields if field not in data]
         if missing_fields:
-            raise BadRequest(f"Missing required fields: {', '.join(missing_fields)}")
+            # Use optimized string operations for error messages
+            try:
+                from Utils.string_optimizer import build_error_message
+                error_msg = build_error_message("Missing required fields", missing_fields)
+                raise BadRequest(error_msg)
+            except ImportError:
+                # Fallback to original implementation
+                raise BadRequest(f"Missing required fields: {', '.join(missing_fields)}")
     
     return data
 
@@ -509,7 +526,7 @@ def business_rule_extraction():
                 error_code="VALIDATION_ERROR"
             ), 400
         
-        if len(legacy_code) > 1000000:  # 1MB limit for legacy code
+        if len(legacy_code) > performance_config.get('max_legacy_code_bytes', 1048576):  # Configurable limit for legacy code
             return create_simple_response(
                 success=False,
                 message="Legacy code exceeds maximum size (1MB)",
@@ -991,10 +1008,10 @@ def enterprise_data_privacy():
             ), 400
         
         # Validate batch size
-        if not isinstance(batch_size, int) or batch_size < 1 or batch_size > 10000:
+        if not isinstance(batch_size, int) or batch_size < 1 or batch_size > performance_config.get('batch_size_limit', 10000):
             return create_simple_response(
                 success=False,
-                message="batch_size must be an integer between 1 and 10000",
+                message=f"batch_size must be an integer between 1 and {performance_config.get('batch_size_limit', 10000)}",
                 error_code="VALIDATION_ERROR"
             ), 400
         

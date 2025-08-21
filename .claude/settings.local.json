@@ -14,7 +14,8 @@
       "Bash(set FLASK_ENV=development)",
       "Bash(timeout:*)",
       "Bash(./scripts/sync-changelog.sh:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(del test_config_extraction.py)"
     ],
     "deny": []
   }

@@ -18,6 +18,16 @@ import re
 import uuid
 from pathlib import Path, PurePath
 from typing import Any, Dict, List, Optional, Union, Callable, Type, Tuple
+
+# Load performance configuration for validation limits
+try:
+    from Utils.config_loader import load_config
+    performance_config = load_config('agent_defaults', {}).get('agent_defaults', {}).get('performance_thresholds', {})
+except Exception:
+    # Fallback configuration if config loading fails
+    performance_config = {
+        'large_text_threshold': 10000
+    }
 from urllib.parse import unquote
 from enum import Enum
 from datetime import datetime, timezone
@@ -527,7 +537,7 @@ class ParameterValidator:
         issues = []
         
         # Check list size
-        if len(value) > 10000:  # Reasonable limit
+        if len(value) > performance_config.get('large_text_threshold', 10000):  # Configurable limit
             issues.append(f"List parameter '{name}' has too many items")
         
         return len(issues) == 0, issues
