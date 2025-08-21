@@ -16,7 +16,8 @@
       "Bash(./scripts/sync-changelog.sh:*)",
       "Bash(mkdir:*)",
       "Bash(del test_config_extraction.py)",
-      "Bash(dir test_*.py)"
+      "Bash(dir test_*.py)",
+      "Bash(find:*)"
     ],
     "deny": []
   }
