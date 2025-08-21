@@ -277,20 +277,30 @@ class BusinessRuleExtractionAgent(BaseAgent):
         Prepares the system and user prompts for the LLM based on the code snippet.
         """
         system_prompt = (
-            f"You are an expert business rule extraction and translation agent. "
-            f"Your task is to analyze legacy code snippets, identify embedded business rules, "
-            f"separate them from technical implementation details, and translate any cryptic "
-            f"technical terminology into clear, business-friendly language. "
-            f"Output the extracted rules in a structured JSON array format, where each rule "
-            f"has 'rule_id', 'conditions', 'actions', 'business_description', and 'source_code_lines'."
+            f"You are an expert business rule extraction and translation agent specialized in legacy code analysis. "
+            f"Your task is to comprehensively analyze code snippets and identify ALL types of embedded business rules: "
+            f"VALIDATION rules (age limits, eligibility criteria), CALCULATION rules (premium formulas, rate adjustments), "
+            f"DECISION rules (approval/rejection logic, risk assessment), WORKFLOW rules (sequential processing steps), "
+            f"CONDITIONAL rules (IF/THEN/ELSE business logic), and DATA TRANSFORMATION rules (field mappings, conversions). "
+            f"Pay special attention to: 1) Nested IF/EVALUATE/PERFORM statements containing business logic, "
+            f"2) Sequential workflow patterns with business significance, 3) Complex conditional chains, "
+            f"4) Embedded calculations with business meaning, 5) Process control statements that implement business rules. "
+            f"Separate technical implementation from business intent and translate technical terms into clear business language. "
+            f"Output ALL discovered rules in structured JSON format with comprehensive business context."
         )
 
         user_prompt = (
-            f"Analyze the following legacy code snippet and extract all explicit and implicit "
-            f"business rules. For each rule, provide its conditions, actions, a clear "
-            f"business description, and the relevant lines from the source code. "
-            f"Translate any technical terms into business language. "
-            f"If no business rules are found, return an empty array.\n\n"
+            f"COMPREHENSIVE RULE EXTRACTION: Analyze the following legacy code snippet and extract ALL business rules. "
+            f"Look beyond obvious validation rules to identify: "
+            f"• WORKFLOW RULES: Sequential processing steps (PERFORM statements, process flow) "
+            f"• DECISION RULES: Complex conditional logic (nested IF/EVALUATE, approval/rejection chains) "
+            f"• CONDITIONAL RULES: Business IF/THEN patterns (rate adjustments, surcharges, discounts) "
+            f"• CALCULATION RULES: Premium computations, rate formulas, business calculations "
+            f"• VALIDATION RULES: Age limits, credit requirements, eligibility criteria "
+            f"• DATA TRANSFORMATION: Field mappings, business value conversions "
+            f"For each rule, provide detailed conditions, actions, business description, and source code lines. "
+            f"Focus on capturing the business intent behind technical implementations. "
+            f"IMPORTANT: Extract rules from ALL sections including procedure calls, nested logic, and sequential workflows.\n\n"
             f"Code Snippet:\n```\n{code_snippet}\n```\n\n"
             f"Example JSON Output Format:\n"
             f"""[
@@ -298,23 +308,34 @@ class BusinessRuleExtractionAgent(BaseAgent):
     "rule_id": "RULE_001",
     "conditions": "Customer age must be 18 or older",
     "actions": "Approve loan application for processing",
-    "business_description": "Loan Eligibility Rule: Only adult customers (18+) are eligible for loan applications to comply with legal requirements",
+    "business_description": "Age Validation Rule: Only adult customers (18+) are eligible for loan applications to comply with legal requirements",
     "source_lines": "lines 45-47",
-    "technical_implementation": "if (customer.age >= 18) {{ approveApplication(customer); }}",
-    "business_domain": "financial_services",
-    "priority": "high",
-    "compliance_notes": "Legal requirement - age of majority"
+    "technical_implementation": "IF APPLICANT-AGE >= MIN-AGE THEN APPROVE",
+    "business_domain": "validation",
+    "rule_category": "validation",
+    "priority": "high"
   }},
   {{
     "rule_id": "RULE_002", 
-    "conditions": "Credit score below 600",
-    "actions": "Automatically reject application",
-    "business_description": "Credit Risk Rule: Applications with credit scores below 600 are automatically rejected due to high default risk",
-    "source_lines": "lines 52-55",
-    "technical_implementation": "if (creditScore < 600) {{ rejectApplication('LOW_CREDIT'); }}",
-    "business_domain": "risk_management",
-    "priority": "high",
-    "compliance_notes": "Risk management policy"
+    "conditions": "Processing workflow after validation passes",
+    "actions": "Execute premium calculation then display results",
+    "business_description": "Policy Processing Workflow: Applications follow validation → calculation → results sequence",
+    "source_lines": "lines 10-12",
+    "technical_implementation": "PERFORM VALIDATE-APPLICATION, PERFORM CALCULATE-PREMIUM, PERFORM DISPLAY-RESULTS",
+    "business_domain": "workflow",
+    "rule_category": "workflow",
+    "priority": "medium"
+  }},
+  {{
+    "rule_id": "RULE_003",
+    "conditions": "Auto policy AND applicant age under 25",
+    "actions": "Apply 50% surcharge to premium",
+    "business_description": "Young Driver Decision Rule: Auto insurance for drivers under 25 requires 50% premium surcharge due to higher risk",
+    "source_lines": "lines 180-182",
+    "technical_implementation": "IF AUTO-POLICY AND APPLICANT-AGE < YOUNG-DRIVER-AGE COMPUTE PREMIUM * 1.50",
+    "business_domain": "decision",
+    "rule_category": "decision",
+    "priority": "high"
   }}
 ]"""
         )
@@ -1169,7 +1190,7 @@ class BusinessRuleExtractionAgent(BaseAgent):
             
             # Log target achievement status
             if completeness_report.is_target_achieved:
-                self.logger.success(
+                self.logger.info(
                     f"SUCCESS: 90% completeness target achieved! "
                     f"({completeness_report.completeness_percentage:.1f}%)",
                     request_id=request_id
