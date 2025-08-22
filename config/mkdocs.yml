@@ -86,6 +86,7 @@ nav:
     - Utilities:
       - Base Agent: api/utilities/base-agent.md
       - Configuration Loader: api/utilities/config-loader.md
+      - Security Utilities: api/utilities/security.md
       - Utility Functions: api/utilities/utils.md
       - Exception Classes: api/utilities/exceptions.md
   - Examples:

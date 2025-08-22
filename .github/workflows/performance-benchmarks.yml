@@ -1,0 +1,349 @@
+name: Performance Benchmarks
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - '**/*.py'
+      - 'requirements*.txt'
+      - 'config/**/*.yaml'
+  
+  push:
+    branches: [ main ]
+    paths:
+      - '**/*.py'
+      - 'requirements*.txt'
+      - 'config/**/*.yaml'
+  
+  # Allow manual triggering for performance testing
+  workflow_dispatch:
+    inputs:
+      performance_mode:
+        description: 'Performance test mode'
+        required: true
+        default: 'standard'
+        type: choice
+        options:
+          - standard
+          - comprehensive
+          - memory-intensive
+
+jobs:
+  performance-benchmarks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11']
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y redis-server
+        sudo systemctl start redis-server
+        sudo systemctl status redis-server
+    
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+        pip install psutil memory-profiler pytest-benchmark
+    
+    - name: Verify Redis connection
+      run: |
+        redis-cli ping
+        python -c "import redis; r = redis.Redis(); print('Redis version:', r.info()['redis_version'])"
+    
+    - name: Run Performance Benchmarks
+      id: benchmarks
+      env:
+        PERFORMANCE_MODE: ${{ github.event.inputs.performance_mode || 'standard' }}
+        REDIS_HOST: localhost
+        REDIS_PORT: 6379
+        PYTHON_VERSION: ${{ matrix.python-version }}
+      run: |
+        echo "::group::Performance Benchmark Execution"
+        
+        # Create benchmark output directory
+        mkdir -p benchmark_results
+        
+        # Run performance benchmarks using the Utils/performance_benchmarks.py
+        python -c "
+        import sys
+        import os
+        import json
+        import time
+        from datetime import datetime
+        
+        # Add project root to Python path
+        sys.path.insert(0, '.')
+        
+        from Utils.performance_benchmarks import PerformanceBenchmarkSuite, BenchmarkConfig
+        from Utils.grep_tool import GrepTool
+        from Utils.memory_pool import MemoryPool
+        from Utils.string_optimizer import StringBuffer
+        from Utils.dynamic_batch_processor import DynamicBatchProcessor
+        
+        # Create benchmark configuration
+        config = BenchmarkConfig(
+            test_iterations=50 if os.getenv('PERFORMANCE_MODE') == 'comprehensive' else 20,
+            warmup_iterations=5,
+            max_test_duration_seconds=300,
+            memory_monitoring_enabled=True,
+            enable_detailed_metrics=True
+        )
+        
+        # Initialize benchmark suite
+        benchmark_suite = PerformanceBenchmarkSuite(config)
+        
+        print('Starting performance benchmarks...')
+        start_time = time.time()
+        
+        # Run core component benchmarks
+        results = {}
+        
+        # GrepTool performance
+        print('Benchmarking GrepTool...')
+        grep_tool = GrepTool()
+        test_text = 'Sample PII data: SSN 123-45-6789, email test@example.com, phone (555) 123-4567 ' * 1000
+        
+        grep_results = benchmark_suite.benchmark_function(
+            func=lambda: grep_tool.search_pattern(test_text, r'\d{3}-\d{2}-\d{4}'),
+            function_name='GrepTool.search_pattern',
+            description='PII pattern matching performance'
+        )
+        results['grep_tool'] = grep_results
+        
+        # StringBuffer performance  
+        print('Benchmarking StringBuffer...')
+        string_results = benchmark_suite.benchmark_function(
+            func=lambda: StringBuffer().append('test').append(' data').append(' string').build(),
+            function_name='StringBuffer.operations',
+            description='String building performance'
+        )
+        results['string_buffer'] = string_results
+        
+        # Memory Pool performance
+        print('Benchmarking MemoryPool...')
+        memory_pool = MemoryPool(pool_type=dict, max_size=100)
+        memory_results = benchmark_suite.benchmark_function(
+            func=lambda: memory_pool.get_object(),
+            function_name='MemoryPool.get_object',
+            description='Object pooling performance'
+        )
+        results['memory_pool'] = memory_results
+        
+        # Batch Processor performance
+        print('Benchmarking DynamicBatchProcessor...')
+        batch_processor = DynamicBatchProcessor()
+        test_data = list(range(1000))
+        batch_results = benchmark_suite.benchmark_function(
+            func=lambda: list(batch_processor.process_batch(test_data, lambda x: x * 2)),
+            function_name='DynamicBatchProcessor.process_batch',
+            description='Batch processing performance'
+        )
+        results['batch_processor'] = batch_results
+        
+        # Generate comprehensive report
+        total_time = time.time() - start_time
+        print(f'Benchmarks completed in {total_time:.2f} seconds')
+        
+        # Create summary for GitHub Actions
+        summary = {
+            'timestamp': datetime.now().isoformat(),
+            'python_version': os.getenv('PYTHON_VERSION'),
+            'performance_mode': os.getenv('PERFORMANCE_MODE'),
+            'total_duration_seconds': total_time,
+            'benchmark_results': results,
+            'performance_summary': {
+                'grep_tool_ops_per_sec': results['grep_tool']['performance_metrics']['operations_per_second'],
+                'string_buffer_ops_per_sec': results['string_buffer']['performance_metrics']['operations_per_second'],
+                'memory_pool_ops_per_sec': results['memory_pool']['performance_metrics']['operations_per_second'],
+                'batch_processor_ops_per_sec': results['batch_processor']['performance_metrics']['operations_per_second']
+            }
+        }
+        
+        # Save detailed results
+        with open('benchmark_results/performance_results.json', 'w') as f:
+            json.dump(summary, f, indent=2)
+        
+        # Output results for GitHub Actions
+        print('=== PERFORMANCE BENCHMARK RESULTS ===')
+        for component, result in results.items():
+            metrics = result['performance_metrics']
+            print(f'{component}: {metrics[\"operations_per_second\"]:.0f} ops/sec, {metrics[\"average_duration_ms\"]:.3f}ms avg')
+        
+        # Check for performance regressions (basic thresholds)
+        performance_issues = []
+        thresholds = {
+            'grep_tool': 1000,  # ops/sec
+            'string_buffer': 10000,
+            'memory_pool': 50000,
+            'batch_processor': 500
+        }
+        
+        for component, threshold in thresholds.items():
+            actual = results[component]['performance_metrics']['operations_per_second']
+            if actual < threshold:
+                performance_issues.append(f'{component}: {actual:.0f} ops/sec (expected >{threshold})')
+        
+        if performance_issues:
+            print('::warning title=Performance Issues Detected::')
+            for issue in performance_issues:
+                print(f'::warning::{issue}')
+        else:
+            print('::notice title=Performance Tests Passed::All components meeting performance thresholds')
+        
+        # Set outputs for next steps
+        with open('$GITHUB_OUTPUT', 'a') as f:
+            f.write(f'performance_passed={'true' if not performance_issues else 'false'}\n')
+            f.write(f'grep_tool_ops_per_sec={results[\"grep_tool\"][\"performance_metrics\"][\"operations_per_second\"]:.0f}\n')
+            f.write(f'total_duration={total_time:.2f}\n')
+        "
+        
+        echo "::endgroup::"
+    
+    - name: Upload benchmark results
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-results-python-${{ matrix.python-version }}
+        path: benchmark_results/
+        retention-days: 30
+    
+    - name: Performance regression check
+      if: github.event_name == 'pull_request'
+      run: |
+        echo "::group::Performance Regression Analysis"
+        
+        # In a real implementation, this would compare against baseline performance
+        # For now, we'll just validate that performance meets minimum thresholds
+        
+        if [ "${{ steps.benchmarks.outputs.performance_passed }}" = "true" ]; then
+          echo "✅ Performance tests passed - no regressions detected"
+          echo "📊 GrepTool: ${{ steps.benchmarks.outputs.grep_tool_ops_per_sec }} ops/sec"
+          echo "⏱️ Total benchmark time: ${{ steps.benchmarks.outputs.total_duration }}s"
+        else
+          echo "::error::Performance regression detected - see benchmark results"
+          echo "::notice::Review the performance warning details above"
+          # Don't fail the build, just warn
+        fi
+        
+        echo "::endgroup::"
+    
+    - name: Comment PR with results
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          
+          try {
+            const results = JSON.parse(fs.readFileSync('benchmark_results/performance_results.json', 'utf8'));
+            const summary = results.performance_summary;
+            
+            const comment = `## 🚀 Performance Benchmark Results (Python ${{ matrix.python-version }})
+            
+            | Component | Performance | Status |
+            |-----------|-------------|--------|
+            | GrepTool | ${summary.grep_tool_ops_per_sec.toFixed(0)} ops/sec | ${summary.grep_tool_ops_per_sec > 1000 ? '✅' : '⚠️'} |
+            | StringBuffer | ${summary.string_buffer_ops_per_sec.toFixed(0)} ops/sec | ${summary.string_buffer_ops_per_sec > 10000 ? '✅' : '⚠️'} |
+            | MemoryPool | ${summary.memory_pool_ops_per_sec.toFixed(0)} ops/sec | ${summary.memory_pool_ops_per_sec > 50000 ? '✅' : '⚠️'} |
+            | BatchProcessor | ${summary.batch_processor_ops_per_sec.toFixed(0)} ops/sec | ${summary.batch_processor_ops_per_sec > 500 ? '✅' : '⚠️'} |
+            
+            **Total benchmark time:** ${results.total_duration_seconds.toFixed(2)}s
+            **Performance mode:** ${results.performance_mode}
+            **Python version:** ${results.python_version}
+            
+            ${'${{ steps.benchmarks.outputs.performance_passed }}' === 'true' ? '✅ All performance thresholds met' : '⚠️ Some performance thresholds not met - see details above'}
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+          } catch (error) {
+            console.log('Could not read benchmark results:', error.message);
+          }
+
+  memory-stress-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.event.inputs.performance_mode == 'memory-intensive' || github.event_name == 'push'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install psutil memory-profiler
+    
+    - name: Memory stress test
+      run: |
+        echo "::group::Memory Stress Testing"
+        
+        python -c "
+        import psutil
+        import sys
+        import gc
+        sys.path.insert(0, '.')
+        
+        from Agents.EnterpriseDataPrivacyAgent import EnterpriseDataPrivacyAgent
+        from Utils.memory_pool import MemoryPool
+        
+        print('Starting memory stress test...')
+        process = psutil.Process()
+        initial_memory = process.memory_info().rss / 1024 / 1024  # MB
+        print(f'Initial memory usage: {initial_memory:.2f} MB')
+        
+        # Test memory pool efficiency
+        memory_pool = MemoryPool(pool_type=dict, max_size=1000)
+        
+        # Create and destroy many objects
+        for i in range(10000):
+            obj = memory_pool.get_object()
+            obj['test_data'] = 'x' * 100
+            memory_pool.return_object(obj)
+            
+            if i % 1000 == 0:
+                current_memory = process.memory_info().rss / 1024 / 1024
+                print(f'Iteration {i}: {current_memory:.2f} MB')
+        
+        # Force garbage collection
+        gc.collect()
+        
+        final_memory = process.memory_info().rss / 1024 / 1024
+        memory_increase = final_memory - initial_memory
+        
+        print(f'Final memory usage: {final_memory:.2f} MB')
+        print(f'Memory increase: {memory_increase:.2f} MB')
+        
+        # Check for memory leaks (should be minimal increase)
+        if memory_increase > 50:  # MB
+            print('::warning::Potential memory leak detected')
+            sys.exit(1)
+        else:
+            print('✅ Memory usage within acceptable limits')
+        "
+        
+        echo "::endgroup::"
