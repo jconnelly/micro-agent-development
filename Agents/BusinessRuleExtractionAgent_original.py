@@ -1248,7 +1248,7 @@ class BusinessRuleExtractionAgent(BaseAgent):
             import traceback
             self.logger.debug(f"Completeness analysis error details: {traceback.format_exc()}", request_id=request_id)
     
-    def get_last_completeness_report(self):
+    def get_last_completeness_report(self) -> Optional[Any]:
         """
         Get the most recent completeness analysis report.
         

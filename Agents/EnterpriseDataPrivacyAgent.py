@@ -31,6 +31,7 @@ from .ComplianceMonitoringAgent import AuditLevel
 # Import Utils directly from Utils module
 from Utils.time_utils import TimeUtils
 from Utils.text_processing import TextProcessingUtils
+from .Exceptions import PIIProcessingError, AgentException
 
 
 class EnterpriseDataPrivacyAgent(PersonalDataProtectionAgent):
@@ -319,11 +320,21 @@ class EnterpriseDataPrivacyAgent(PersonalDataProtectionAgent):
                                 })
                                 
                             except Exception as e:
-                                self.logger.warning(f"Grep tool failed for pattern {pattern[:30]}...: {e}", request_id=request_id)
+                                # Use standardized error handling for grep tool failures
+                                grep_error = PIIProcessingError(
+                                    f"PII grep detection failed: Grep tool failed for pattern {pattern[:30]}...",
+                                    context={
+                                        "operation": "PII grep detection",
+                                        "pattern_preview": pattern[:30],
+                                        "pii_type": pii_type.value
+                                    },
+                                    request_id=request_id
+                                )
+                                self.logger.warning(str(grep_error))
                                 grep_operations.append({
                                     'pii_type': pii_type.value,
                                     'pattern': pattern[:50] + '...',
-                                    'error': str(e),
+                                    'error': str(grep_error),
                                     'method': 'grep_tool_failed'
                                 })
             else:
@@ -331,7 +342,17 @@ class EnterpriseDataPrivacyAgent(PersonalDataProtectionAgent):
                 return self._detect_pii(text)
                 
         except Exception as e:
-            self.logger.error(f"Grep tool detection failed, falling back to standard detection: {e}", request_id=request_id)
+            # Use standardized error handling for overall grep tool failure
+            fallback_error = PIIProcessingError(
+                f"PII grep tool detection failed, falling back to standard detection: {str(e)}",
+                context={
+                    "operation": "PII grep tool detection",
+                    "fallback_used": True,
+                    "original_error_type": type(e).__name__
+                },
+                request_id=request_id
+            )
+            self.logger.error(str(fallback_error))
             return self._detect_pii(text)
         
         detection_duration = TimeUtils.calculate_duration_ms(detection_start)

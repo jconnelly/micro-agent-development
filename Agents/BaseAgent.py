@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .Logger import AgentLogger
-from .Exceptions import ConfigurationError, APITimeoutError
+from .Exceptions import ConfigurationError, APITimeoutError, AgentException
 
 
 class AuditSystemInterface(Protocol):
@@ -201,7 +201,14 @@ class BaseAgent(ABC):
             self.logger.debug(f"Loaded agent configuration from external file")
             
         except Exception as e:
-            self.logger.warning(f"Failed to load agent configuration: {e}. Using fallback.")
+            # Use standardized error handling but continue with fallback
+            config_error = ConfigurationError(
+                f"Failed to load agent configuration: {str(e)}",
+                context={"config_name": "agent_defaults"},
+                request_id=getattr(self, 'request_id', None)
+            )
+            self.logger.warning(str(config_error))
+            
             # Use hardcoded fallback values
             self.API_TIMEOUT_SECONDS = 30.0
             self.MAX_RETRIES = 3
@@ -495,6 +502,15 @@ class BaseAgent(ABC):
                 }
                 
             except Exception as e:
+                # Use standardized error handling for LLM provider failures
+                llm_error = AgentException(
+                    f"LLM call failed: {str(e)}",
+                    error_code="LLM_CALL_ERROR",
+                    context={"operation": "LLM call", "provider": "llm_provider"},
+                    request_id=getattr(self, 'request_id', None)
+                )
+                self.logger.error(str(llm_error))
+                
                 return {
                     "content": "",
                     "model_name": self.model_name,
@@ -917,7 +933,7 @@ class BaseAgent(ABC):
                                  operation_type: Union[AuditOperationType, str],
                                  operation_name: str,
                                  user_context: Dict[str, Any] = None,
-                                 audit_level: int = None):
+                                 audit_level: int = None) -> Any:
         """
         Context manager for automatic audit trail logging of operations.
         

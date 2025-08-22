@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional, List
 # Import other Agents from current location, change package location if moved
 from .BaseAgent import BaseAgent
 from .ComplianceMonitoringAgent import ComplianceMonitoringAgent, AuditLevel
-from .Exceptions import TriageProcessingError, ValidationError
+from .Exceptions import TriageProcessingError, ValidationError, AgentException
 from .PersonalDataProtectionAgent import PersonalDataProtectionAgent, PIIContext, MaskingStrategy
 
 class ApplicationTriageAgent(BaseAgent):
@@ -294,7 +294,17 @@ class ApplicationTriageAgent(BaseAgent):
                 scrubbed_submission_data = pii_scrubbing_result['scrubbed_data']
                 self.logger.info(f"PII scrubbing completed. Detected {len(pii_scrubbing_result['pii_detected'])} PII types", request_id=request_id)
             except Exception as e:
-                self.logger.error(f"PII scrubbing failed: {str(e)}", request_id=request_id, exception=e)
+                # Use standardized error handling for PII scrubbing failures
+                pii_error = TriageProcessingError(
+                    f"PII scrubbing failed: {str(e)}",
+                    context={
+                        "operation": "PII scrubbing",
+                        "fallback_used": True,
+                        "original_error_type": type(e).__name__
+                    },
+                    request_id=request_id
+                )
+                self.logger.error(str(pii_error), exception=e)
                 # Continue with original data but log the failure
                 scrubbed_submission_data = submission_data
         
@@ -348,8 +358,19 @@ class ApplicationTriageAgent(BaseAgent):
             self._handle_timeout_error(e, tokens_input, tokens_output, submission_data, request_id)
             triage_decision["reasoning"] = f"LLM processing timeout: {str(e)}"
         except Exception as e:
-            self._handle_unexpected_error(e, tokens_input, tokens_output, submission_data, request_id)
-            triage_decision["reasoning"] = f"LLM processing error: {str(e)}"
+            # Use standardized error handling for LLM processing failures
+            llm_error = TriageProcessingError(
+                f"LLM triage processing failed: {str(e)}",
+                context={
+                    "operation": "LLM triage processing",
+                    "original_error_type": type(e).__name__,
+                    "tokens_input": tokens_input,
+                    "tokens_output": tokens_output
+                },
+                request_id=request_id
+            )
+            self._handle_unexpected_error(llm_error, tokens_input, tokens_output, submission_data, request_id)
+            triage_decision["reasoning"] = str(llm_error)
         
         return triage_decision, llm_response, tokens_input, tokens_output, tool_calls, retrieved_chunks
     

@@ -11,7 +11,7 @@ from functools import lru_cache
 # Import other Agents from current location, change package location if moved
 from .BaseAgent import BaseAgent
 from .ComplianceMonitoringAgent import ComplianceMonitoringAgent, AuditLevel
-from .Exceptions import RuleExtractionError, ValidationError
+from .Exceptions import RuleExtractionError, ValidationError, AgentException
 
 # Import modular components (Phase 16 Task 2)
 from .extraction_components import LanguageProcessor, ChunkProcessor, RuleValidator, ExtractionEngine
@@ -266,22 +266,32 @@ class BusinessRuleExtractionAgent(BaseAgent):
             return result
             
         except Exception as e:
-            # Handle and audit errors
+            # Handle and audit errors using standardized approach
             processing_time = time.time() - start_time
             
+            # Create standardized error with context
+            extraction_error = RuleExtractionError(
+                f"Rule extraction failed: {str(e)}",
+                context={
+                    "operation": "rule extraction",
+                    "processing_time_seconds": processing_time,
+                    "architecture": "modular_phase16",
+                    "filename": filename if 'filename' in locals() else "unknown",
+                    "original_error_type": type(e).__name__
+                },
+                request_id=request_id
+            )
+            self.logger.error(str(extraction_error))
+            
+            # Audit the error
             self.audit_system.log_agent_action(
                 agent_id=self.agent_id,
                 action="rule_extraction_error",
-                details={
-                    "request_id": request_id,
-                    "error": str(e),
-                    "processing_time_seconds": processing_time,
-                    "architecture": "modular_phase16"
-                },
+                details=extraction_error.to_dict(),
                 audit_level=audit_level
             )
             
-            raise RuleExtractionError(f"Rule extraction failed: {str(e)}")
+            raise extraction_error
     
     def _process_file_chunks(self, legacy_code_snippet: str, context: Optional[str], 
                             request_id: str, filename: str, chunking_params: Dict[str, Any],

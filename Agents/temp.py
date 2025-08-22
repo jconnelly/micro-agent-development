@@ -9,7 +9,7 @@ class PolicyInquiryAgent:
         """Initializes the agent with an empty knowledge base."""
         self.knowledge_base: List[Dict[str, str]] = []
 
-    def ingest_documents(self, documents: List[Dict[str, str]]):
+    def ingest_documents(self, documents: List[Dict[str, str]]) -> None:
         """
         Simulates the process of ingesting documents into a knowledge base.
         In a real-world system, this would involve creating vector embeddings
