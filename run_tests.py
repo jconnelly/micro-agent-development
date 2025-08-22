@@ -96,6 +96,8 @@ class TestRunner:
                 cwd=self.project_root,
                 capture_output=True,
                 text=True,
+                encoding='utf-8',
+                errors='replace',  # Replace problematic characters
                 timeout=1800  # 30 minute timeout
             )
             
@@ -111,10 +113,10 @@ class TestRunner:
             return results
             
         except subprocess.TimeoutExpired:
-            print("❌ Tests timed out after 30 minutes")
+            print("[FAIL] Tests timed out after 30 minutes")
             return {"success": False, "error": "timeout"}
         except Exception as e:
-            print(f"❌ Error running tests: {str(e)}")
+            print(f"[ERROR] Error running tests: {str(e)}")
             return {"success": False, "error": str(e)}
     
     def _parse_test_results(self, result: subprocess.CompletedProcess, duration: float) -> Dict[str, Any]:
@@ -155,31 +157,31 @@ class TestRunner:
     def _print_summary(self, results: Dict[str, Any]):
         """Print formatted test results summary."""
         print("\n" + "=" * 60)
-        print("🧪 TEST RESULTS SUMMARY")
+        print("[RESULTS] TEST RESULTS SUMMARY")
         print("=" * 60)
         
         if results["success"]:
-            print("✅ ALL TESTS PASSED")
+            print("[PASS] ALL TESTS PASSED")
         else:
-            print("❌ SOME TESTS FAILED")
+            print("[FAIL] SOME TESTS FAILED")
         
         print(f"⏱️  Duration: {results['duration_seconds']:.2f} seconds")
         
         if "tests_passed" in results:
-            print(f"✅ Passed: {results['tests_passed']}")
+            print(f"[PASS] Passed: {results['tests_passed']}")
         if "tests_failed" in results:
-            print(f"❌ Failed: {results['tests_failed']}")
+            print(f"[FAIL] Failed: {results['tests_failed']}")
         
         if "coverage_percent" in results:
             coverage = results["coverage_percent"]
             if coverage >= 90:
-                print(f"🎯 Coverage: {coverage}% (Excellent)")
+                print(f"[COVERAGE] Coverage: {coverage}% (Excellent)")
             elif coverage >= 80:
-                print(f"📊 Coverage: {coverage}% (Good)")
+                print(f"[COVERAGE] Coverage: {coverage}% (Good)")
             elif coverage >= 70:
                 print(f"⚠️  Coverage: {coverage}% (Acceptable)")
             else:
-                print(f"🔴 Coverage: {coverage}% (Needs Improvement)")
+                print(f"[COVERAGE] Coverage: {coverage}% (Needs Improvement)")
         
         print("=" * 60)
         
@@ -199,7 +201,7 @@ class TestRunner:
     
     def run_security_tests(self) -> Dict[str, Any]:
         """Run security-focused tests."""
-        print("🔒 Running Security Tests...")
+        print("[SECURITY] Running Security Tests...")
         return self.run_tests(
             markers=["security"],
             coverage=True,
@@ -208,7 +210,7 @@ class TestRunner:
     
     def run_performance_tests(self) -> Dict[str, Any]:
         """Run performance-focused tests."""
-        print("⚡ Running Performance Tests...")
+        print("[PERFORMANCE] Running Performance Tests...")
         return self.run_tests(
             markers=["performance"],
             coverage=False,  # Focus on speed, not coverage
@@ -217,7 +219,7 @@ class TestRunner:
     
     def run_critical_tests(self) -> Dict[str, Any]:
         """Run only critical tests for quick validation."""
-        print("🚨 Running Critical Tests...")
+        print("[CRITICAL] Running Critical Tests...")
         return self.run_tests(
             markers=["critical"],
             coverage=True,
@@ -227,7 +229,7 @@ class TestRunner:
     def run_specific_agent_tests(self, agent_name: str) -> Dict[str, Any]:
         """Run tests for a specific agent."""
         test_file = f"test_{agent_name.lower()}_agent.py"
-        print(f"🎯 Running tests for {agent_name}...")
+        print(f"[AGENT] Running tests for {agent_name}...")
         return self.run_tests(
             test_filter=test_file,
             coverage=True,
@@ -314,10 +316,10 @@ def main():
         sys.exit(0 if results["success"] else 1)
         
     except KeyboardInterrupt:
-        print("\n❌ Tests interrupted by user")
+        print("\n[INTERRUPTED] Tests interrupted by user")
         sys.exit(130)
     except Exception as e:
-        print(f"❌ Unexpected error: {str(e)}")
+        print(f"[ERROR] Unexpected error: {str(e)}")
         sys.exit(1)
 
 
