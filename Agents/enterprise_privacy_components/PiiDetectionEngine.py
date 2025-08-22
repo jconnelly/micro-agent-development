@@ -21,6 +21,14 @@ from typing import Dict, Any, List, Optional
 from Utils.pii_components import PIIType
 from Utils.time_utils import TimeUtils
 
+# Import high-performance grep tool
+try:
+    from Utils.grep_tool import GrepTool
+    GREP_TOOL_AVAILABLE = True
+except ImportError:
+    GREP_TOOL_AVAILABLE = False
+    GrepTool = None
+
 
 class PiiDetectionEngine:
     """
@@ -52,9 +60,21 @@ class PiiDetectionEngine:
             logger: Logger instance for audit trail and debugging
         """
         self.patterns = patterns
-        self.grep_tool = grep_tool
         self.agent_config = agent_config or {}
         self.logger = logger
+        
+        # Initialize grep tool for high-performance pattern matching
+        if grep_tool is not None:
+            self.grep_tool = grep_tool
+        elif GREP_TOOL_AVAILABLE:
+            # Create default high-performance grep tool
+            self.grep_tool = GrepTool(logger=logger, use_system_grep=True)
+            if logger:
+                logger.info("Initialized high-performance GrepTool for PII detection")
+        else:
+            self.grep_tool = None
+            if logger:
+                logger.warning("GrepTool not available - using fallback regex processing")
         
         # Pre-compile regex patterns for performance
         self._compiled_patterns = {}
@@ -210,19 +230,18 @@ class PiiDetectionEngine:
                     try:
                         grep_start = datetime.datetime.now(datetime.timezone.utc)
                         
-                        # TODO: Implement actual grep tool integration
-                        # For now, simulate with optimized regex processing
-                        compiled_pattern = re.compile(pattern, re.IGNORECASE)
-                        type_matches = []
-                        
-                        for match in compiled_pattern.finditer(text):
-                            type_matches.append({
-                                'value': match.group(),
-                                'start': match.start(),
-                                'end': match.end(),
-                                'line_number': text[:match.start()].count('\n') + 1,
-                                'confidence': 0.95  # High confidence for pattern matches
-                            })
+                        # High-performance grep tool integration
+                        if self.grep_tool and hasattr(self.grep_tool, 'search_pattern'):
+                            # Use external grep tool for maximum performance
+                            type_matches = self.grep_tool.search_pattern(
+                                text=text,
+                                pattern=pattern,
+                                pii_type=pii_type,
+                                case_insensitive=True
+                            )
+                        else:
+                            # Fallback to optimized regex processing with performance enhancements
+                            type_matches = self._optimized_regex_search(text, pattern)
                         
                         grep_duration = TimeUtils.calculate_duration_ms(grep_start)
                         
@@ -298,6 +317,100 @@ class PiiDetectionEngine:
             'detected_types': detected_types,
             'matches': matches
         }
+    def _optimized_regex_search(self, text: str, pattern: str) -> List[Dict[str, Any]]:
+        """
+        Optimized regex search with performance enhancements.
+        
+        Provides high-performance fallback when grep tool is not available.
+        Uses pre-compiled patterns and efficient string operations.
+        
+        Args:
+            text: Text to search in
+            pattern: Regex pattern to search for
+            
+        Returns:
+            List of match dictionaries with position and metadata
+        """
+        try:
+            # Use pre-compiled pattern if available for better performance
+            compiled_pattern = re.compile(pattern, re.IGNORECASE | re.MULTILINE)
+            type_matches = []
+            
+            # Efficient line-by-line processing for large texts
+            if len(text) > 50000:  # 50KB threshold for line processing
+                lines = text.split('\n')
+                current_pos = 0
+                
+                for line_num, line in enumerate(lines, 1):
+                    for match in compiled_pattern.finditer(line):
+                        absolute_start = current_pos + match.start()
+                        absolute_end = current_pos + match.end()
+                        
+                        type_matches.append({
+                            'value': match.group(),
+                            'start': absolute_start,
+                            'end': absolute_end,
+                            'line_number': line_num,
+                            'confidence': 0.95,  # High confidence for pattern matches
+                            'context': line.strip()  # Add line context for debugging
+                        })
+                    
+                    current_pos += len(line) + 1  # +1 for newline character
+            else:
+                # Standard processing for smaller texts
+                for match in compiled_pattern.finditer(text):
+                    type_matches.append({
+                        'value': match.group(),
+                        'start': match.start(),
+                        'end': match.end(),
+                        'line_number': text[:match.start()].count('\n') + 1,
+                        'confidence': 0.95,  # High confidence for pattern matches
+                        'context': self._extract_match_context(text, match.start(), match.end())
+                    })
+            
+            return type_matches
+            
+        except re.error as e:
+            # Handle invalid regex patterns gracefully
+            if self.logger:
+                self.logger.warning(f"Invalid regex pattern '{pattern}': {e}")
+            return []
+        except Exception as e:
+            # Handle any other errors gracefully
+            if self.logger:
+                self.logger.error(f"Error in optimized regex search: {e}")
+            return []
+    
+    def _extract_match_context(self, text: str, start: int, end: int, context_chars: int = 50) -> str:
+        """
+        Extract context around a match for debugging and validation.
+        
+        Args:
+            text: Full text
+            start: Match start position
+            end: Match end position
+            context_chars: Number of characters before/after to include
+            
+        Returns:
+            Context string with match highlighted
+        """
+        context_start = max(0, start - context_chars)
+        context_end = min(len(text), end + context_chars)
+        
+        context = text[context_start:context_end]
+        match_value = text[start:end]
+        
+        # Replace the match with [MATCH] for clear identification
+        relative_start = start - context_start
+        relative_end = end - context_start
+        
+        context_with_highlight = (
+            context[:relative_start] + 
+            f"[{match_value}]" + 
+            context[relative_end:]
+        )
+        
+        return context_with_highlight.replace('\n', ' ').strip()
     
     def _update_performance_stats(self, detection_duration: float, text_length: int):
         """Update internal performance statistics for monitoring."""
@@ -320,7 +433,7 @@ class PiiDetectionEngine:
         """
         total_detections = self.detection_stats['total_detections']
         
-        return {
+        base_stats = {
             'total_detections': total_detections,
             'grep_tool_usage_percentage': (
                 (self.detection_stats['grep_tool_usage'] / total_detections * 100) 
@@ -339,3 +452,46 @@ class PiiDetectionEngine:
             'patterns_available': sum(len(patterns) for patterns in self.patterns.values()),
             'compiled_patterns_count': sum(len(patterns) for patterns in self._compiled_patterns.values())
         }
+        
+        # Add grep tool performance statistics if available
+        if self.grep_tool and hasattr(self.grep_tool, 'get_performance_stats'):
+            grep_stats = self.grep_tool.get_performance_stats()
+            base_stats['grep_tool_stats'] = grep_stats
+            base_stats['grep_tool_enabled'] = True
+        else:
+            base_stats['grep_tool_enabled'] = False
+            
+        return base_stats
+    
+    def get_grep_tool_info(self) -> Dict[str, Any]:
+        """
+        Get detailed information about the grep tool configuration and performance.
+        
+        Returns:
+            Dictionary with grep tool information and statistics
+        """
+        if not self.grep_tool:
+            return {
+                'enabled': False,
+                'reason': 'No grep tool configured',
+                'fallback_mode': 'optimized_regex'
+            }
+        
+        info = {
+            'enabled': True,
+            'tool_type': type(self.grep_tool).__name__,
+            'fallback_mode': 'optimized_regex'
+        }
+        
+        # Add performance stats if available
+        if hasattr(self.grep_tool, 'get_performance_stats'):
+            info['performance_stats'] = self.grep_tool.get_performance_stats()
+        
+        # Add configuration info if available
+        if hasattr(self.grep_tool, 'system_grep_available'):
+            info['system_grep_available'] = self.grep_tool.system_grep_available
+            
+        if hasattr(self.grep_tool, 'use_system_grep'):
+            info['use_system_grep'] = self.grep_tool.use_system_grep
+            
+        return info

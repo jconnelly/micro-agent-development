@@ -180,7 +180,7 @@ class EnterpriseDataPrivacyAgent(PersonalDataProtectionAgent):
         
         # Initialize concurrent processing capabilities
         try:
-            from ..Utils.concurrent_processor import ConcurrentProcessor
+            from Utils.concurrent_processor import ConcurrentProcessor
             self._concurrent_processor = ConcurrentProcessor(
                 max_workers=None,  # Auto-detect optimal workers
                 enable_monitoring=True,
@@ -398,7 +398,7 @@ class EnterpriseDataPrivacyAgent(PersonalDataProtectionAgent):
         try:
             # Initialize memory pooling for better performance (Task 6 Implementation)
             try:
-                from ..Utils.memory_pool import get_dict_pool, get_list_pool
+                from Utils.memory_pool import get_dict_pool, get_list_pool
                 self._dict_pool = get_dict_pool()
                 self._list_pool = get_list_pool()
                 self._memory_optimized = True
@@ -834,7 +834,7 @@ class EnterpriseDataPrivacyAgent(PersonalDataProtectionAgent):
         Returns:
             Dictionary with enhanced processing results and performance metrics
         """
-        from ..Utils.enhanced_file_processor import EnhancedFileProcessor
+        from Utils.enhanced_file_processor import EnhancedFileProcessor
         
         request_id = request_id or f"enhanced-pii-{uuid.uuid4().hex[:12]}"
         start_time = datetime.datetime.now(datetime.timezone.utc)
@@ -849,7 +849,7 @@ class EnterpriseDataPrivacyAgent(PersonalDataProtectionAgent):
             
             # Use optimized logging for better performance
             try:
-                from ..Utils.string_optimizer import LogMessageBuilder
+                from Utils.string_optimizer import LogMessageBuilder
                 log_message = (LogMessageBuilder()
                               .start_message("Enhanced processing")
                               .add_context("Strategy", strategy)
@@ -949,10 +949,34 @@ class EnterpriseDataPrivacyAgent(PersonalDataProtectionAgent):
                            f"Duration: {total_duration:.1f}ms, Throughput: {performance_info.get('throughput_mb_per_sec', 0):.2f} MB/s",
                            request_id=request_id)
             
+            # Build file metadata for compatibility with tests
+            file_metadata = {
+                'file_path': str(file_path),
+                'file_size_mb': config['file_size_mb'],
+                'file_size_category': config['size_category'],
+                'encoding_detected': encoding,
+                'processing_strategy': strategy,
+                'total_chunks': processing_result.get('total_chunks', 1),
+                'memory_efficient': config.get('memory_efficient', False),
+                'parallel_capable': config.get('parallel_capable', False)
+            }
+            
+            # Build performance metrics for compatibility with tests
+            performance_metrics = {
+                'duration_ms': total_duration,
+                'chunk_processing_time_ms': total_chunk_time,
+                'overhead_time_ms': total_duration - total_chunk_time,
+                'throughput_mb_per_sec': performance_info.get('throughput_mb_per_sec', 0),
+                'total_text_length': total_text_length,
+                'performance_info': performance_info
+            }
+
             return {
                 'request_id': request_id,
                 'success': True,
                 'file_path': str(file_path),
+                'file_metadata': file_metadata,
+                'performance_metrics': performance_metrics,
                 'processing_method': 'enhanced_automatic',
                 'strategy_used': strategy,
                 'file_size_mb': config['file_size_mb'],
@@ -1009,7 +1033,7 @@ class EnterpriseDataPrivacyAgent(PersonalDataProtectionAgent):
         Returns:
             Dictionary with batch processing results and performance metrics
         """
-        from ..Utils.dynamic_batch_processor import DynamicBatchProcessor, BatchConfiguration
+        from Utils.dynamic_batch_processor import DynamicBatchProcessor, BatchConfiguration
         
         request_id = f"batch-pii-{uuid.uuid4().hex[:12]}"
         start_time = datetime.datetime.now(datetime.timezone.utc)

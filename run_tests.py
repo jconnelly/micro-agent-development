@@ -165,7 +165,7 @@ class TestRunner:
         else:
             print("[FAIL] SOME TESTS FAILED")
         
-        print(f"⏱️  Duration: {results['duration_seconds']:.2f} seconds")
+        print(f"[TIME] Duration: {results['duration_seconds']:.2f} seconds")
         
         if "tests_passed" in results:
             print(f"[PASS] Passed: {results['tests_passed']}")
@@ -179,7 +179,7 @@ class TestRunner:
             elif coverage >= 80:
                 print(f"[COVERAGE] Coverage: {coverage}% (Good)")
             elif coverage >= 70:
-                print(f"⚠️  Coverage: {coverage}% (Acceptable)")
+                print(f"[WARNING] Coverage: {coverage}% (Acceptable)")
             else:
                 print(f"[COVERAGE] Coverage: {coverage}% (Needs Improvement)")
         
@@ -187,7 +187,7 @@ class TestRunner:
         
         # Print specific failures if any
         if not results["success"] and "output" in results:
-            print("\n🔍 FAILURE DETAILS:")
+            print("\n[DEBUG] FAILURE DETAILS:")
             lines = results["output"].split("\n")
             in_failure_section = False
             

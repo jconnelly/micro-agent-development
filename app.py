@@ -22,12 +22,25 @@ import sys
 import json
 import time
 import logging
+import hashlib
 from datetime import datetime, timezone
 from functools import wraps
 from typing import Dict, Any, Optional, Tuple, List
 
 from flask import Flask, request, jsonify, g
 from flask_cors import CORS
+
+# Redis for enterprise rate limiting
+try:
+    import redis
+    REDIS_AVAILABLE = True
+except ImportError:
+    REDIS_AVAILABLE = False
+    print("[WARNING] Redis not available - falling back to in-memory rate limiting")
+
+# Simple in-memory fallback rate limiting storage (not suitable for production clusters)
+_memory_rate_limits = {}
+
 from werkzeug.exceptions import BadRequest, RequestEntityTooLarge, InternalServerError
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -214,8 +227,18 @@ def authenticate_request() -> bool:
 
 def rate_limit_check(client_id: str, limit: int = None, window: int = None) -> bool:
     """
-    Simple in-memory rate limiting.
-    In production, use Redis or similar for distributed rate limiting.
+    Enterprise Redis-backed rate limiting with sliding window algorithm.
+    
+    Uses Redis for distributed rate limiting across multiple application instances.
+    Implements sliding window counter with automatic cleanup and fallback support.
+    
+    Args:
+        client_id: Unique identifier for the client (IP, API key hash, etc.)
+        limit: Maximum requests allowed in window (default from config)
+        window: Time window in seconds (default from config)
+        
+    Returns:
+        True if request is allowed, False if rate limit exceeded
     """
     # Get rate limiting configuration
     limit = limit or flask_config.get('rate_limit_per_hour', 100)
@@ -225,8 +248,144 @@ def rate_limit_check(client_id: str, limit: int = None, window: int = None) -> b
     if os.environ.get('FLASK_ENV') == 'development':
         return True
     
-    # TODO: Implement proper rate limiting with Redis
-    # For now, return True to allow all requests
+    # Try Redis-based rate limiting first
+    if REDIS_AVAILABLE:
+        try:
+            return _redis_rate_limit(client_id, limit, window)
+        except Exception as e:
+            logger.warning(f"Redis rate limiting failed, falling back to basic check: {e}")
+            # Fall through to basic rate limiting
+    
+    # Fallback to in-memory rate limiting (not suitable for production clusters)
+    return _fallback_rate_limit(client_id, limit, window)
+
+
+def _get_redis_connection():
+    """Get Redis connection with configuration from YAML config and environment variables."""
+    if not REDIS_AVAILABLE:
+        return None
+        
+    # Check if Redis is enabled in configuration
+    if not flask_config.get('redis_enabled', True):
+        return None
+        
+    try:
+        # Redis configuration from config file with environment variable overrides
+        redis_host = os.environ.get('REDIS_HOST', flask_config.get('redis_host', 'localhost'))
+        redis_port = int(os.environ.get('REDIS_PORT', flask_config.get('redis_port', 6379)))
+        redis_db = int(os.environ.get('REDIS_DB', flask_config.get('redis_db', 0)))
+        redis_password = os.environ.get('REDIS_PASSWORD')  # Only from env for security
+        
+        # Connection pool settings
+        pool_size = flask_config.get('redis_connection_pool_size', 20)
+        timeout = flask_config.get('redis_timeout_seconds', 5)
+        
+        # Connection pool for better performance
+        pool = redis.ConnectionPool(
+            host=redis_host,
+            port=redis_port,
+            db=redis_db,
+            password=redis_password,
+            decode_responses=True,
+            max_connections=pool_size,
+            retry_on_timeout=True,
+            socket_connect_timeout=timeout,
+            socket_timeout=timeout
+        )
+        
+        return redis.Redis(connection_pool=pool)
+    except Exception as e:
+        logger.error(f"Failed to create Redis connection: {e}")
+        return None
+
+
+def _redis_rate_limit(client_id: str, limit: int, window: int) -> bool:
+    """
+    Redis-based sliding window rate limiting implementation.
+    
+    Uses Redis sorted sets to implement efficient sliding window counters
+    with automatic cleanup of expired entries.
+    """
+    redis_client = _get_redis_connection()
+    if not redis_client:
+        return True  # Allow request if Redis unavailable
+    
+    current_time = int(time.time())
+    window_start = current_time - window
+    
+    # Use Redis pipeline for atomic operations
+    pipe = redis_client.pipeline()
+    
+    try:
+        # Key for this client's rate limit counter
+        rate_limit_key = f"rate_limit:{client_id}"
+        
+        # Remove expired entries (outside sliding window)
+        pipe.zremrangebyscore(rate_limit_key, 0, window_start)
+        
+        # Count current requests in window
+        pipe.zcard(rate_limit_key)
+        
+        # Add current request timestamp
+        pipe.zadd(rate_limit_key, {str(current_time): current_time})
+        
+        # Set key expiration (cleanup)
+        pipe.expire(rate_limit_key, window + 60)  # Extra buffer for cleanup
+        
+        # Execute pipeline
+        results = pipe.execute()
+        
+        # Check if limit exceeded (before adding current request)
+        current_count = results[1]  # Result from zcard operation
+        
+        if current_count >= limit:
+            # Remove the request we just added since we're over limit
+            redis_client.zrem(rate_limit_key, str(current_time))
+            logger.info(f"Rate limit exceeded for client {client_id}: {current_count}/{limit} in {window}s")
+            return False
+        
+        logger.debug(f"Rate limit check passed for client {client_id}: {current_count + 1}/{limit} in {window}s")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Redis rate limiting error for client {client_id}: {e}")
+        # Allow request on Redis errors (fail open for availability)
+        return True
+
+
+def _fallback_rate_limit(client_id: str, limit: int, window: int) -> bool:
+    """
+    Fallback in-memory rate limiting when Redis is unavailable.
+    WARNING: Not suitable for production multi-instance deployments.
+    """
+    global _memory_rate_limits
+    current_time = int(time.time())
+    
+    # Clean up old entries periodically
+    if len(_memory_rate_limits) > 1000:  # Prevent memory bloat
+        cutoff = current_time - window
+        _memory_rate_limits = {
+            k: [t for t in v if t > cutoff] 
+            for k, v in _memory_rate_limits.items() 
+            if any(t > cutoff for t in v)
+        }
+    
+    # Get current client's request history
+    client_requests = _memory_rate_limits.get(client_id, [])
+    
+    # Remove requests outside current window
+    client_requests = [t for t in client_requests if t > (current_time - window)]
+    
+    # Check if limit exceeded
+    if len(client_requests) >= limit:
+        logger.info(f"Rate limit exceeded for client {client_id}: {len(client_requests)}/{limit} in {window}s")
+        return False
+    
+    # Add current request
+    client_requests.append(current_time)
+    _memory_rate_limits[client_id] = client_requests
+    
+    logger.debug(f"Rate limit check passed for client {client_id}: {len(client_requests)}/{limit} in {window}s")
     return True
 
 
@@ -244,7 +403,7 @@ def require_auth(f):
 
 
 def handle_request_timing(f):
-    """Decorator to handle request timing and metadata."""
+    """Decorator to handle request timing, metadata, and rate limiting."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         # Generate request ID
@@ -255,6 +414,20 @@ def handle_request_timing(f):
         # Set request metadata
         g.client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
         g.user_agent = request.headers.get('User-Agent', 'Unknown')
+        
+        # Enterprise rate limiting check
+        # Use IP address or API key hash as client identifier
+        api_key = request.headers.get('X-API-Key') or request.headers.get('Authorization', '').replace('Bearer ', '')
+        client_id = hashlib.sha256((api_key or g.client_ip).encode()).hexdigest()[:16]  # 16-char hash for privacy
+        
+        if not rate_limit_check(client_id):
+            logger.warning(f"Rate limit exceeded for client {client_id} (IP: {g.client_ip})")
+            return jsonify({
+                'error': 'Rate limit exceeded',
+                'message': 'Too many requests. Please try again later.',
+                'request_id': request_id,
+                'retry_after': flask_config.get('rate_limit_window_seconds', 3600)
+            }), 429
         
         logger.info(f"Processing request {request_id} from {g.client_ip}")
         

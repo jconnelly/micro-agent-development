@@ -137,6 +137,14 @@ agent_defaults:
     cors_max_age_seconds: 86400      # CORS preflight cache duration (24 hours)
     json_sort_keys: false            # Preserve JSON key order in responses
     jsonify_prettyprint: false       # Disable pretty printing for performance
+    
+    # Redis Rate Limiting Configuration
+    redis_enabled: true              # Enable Redis-backed rate limiting
+    redis_host: "localhost"          # Redis server host (can be overridden by REDIS_HOST env var)
+    redis_port: 6379                # Redis server port (can be overridden by REDIS_PORT env var)
+    redis_db: 0                     # Redis database number (can be overridden by REDIS_DB env var)
+    redis_connection_pool_size: 20  # Maximum Redis connections in pool
+    redis_timeout_seconds: 5        # Redis connection timeout
 
 # Environment-Specific Overrides
 environments:
