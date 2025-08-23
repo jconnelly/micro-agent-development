@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Micro-Agent Development Platform - Marketplace Demo{% endblock %}</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #64748b;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --error-color: #ef4444;
+            --background-light: #f8fafc;
+            --border-color: #e2e8f0;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background-light);
+            color: #1e293b;
+        }
+        
+        .navbar-brand {
+            font-weight: 700;
+            color: var(--primary-color) !important;
+        }
+        
+        .hero-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 4rem 0;
+        }
+        
+        .feature-card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+            height: 100%;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .badge-performance {
+            background-color: var(--success-color);
+        }
+        
+        .badge-capability {
+            background-color: var(--primary-color);
+        }
+        
+        .btn-demo {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+            font-weight: 500;
+        }
+        
+        .btn-demo:hover {
+            background-color: #1d4ed8;
+            border-color: #1d4ed8;
+        }
+        
+        .code-preview {
+            background-color: #1e293b;
+            border-radius: 8px;
+            padding: 1rem;
+            color: #e2e8f0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .result-card {
+            border-left: 4px solid var(--success-color);
+            background-color: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+        }
+        
+        .loading-spinner {
+            display: none;
+        }
+        
+        .agent-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: white;
+            margin-bottom: 1rem;
+        }
+        
+        .icon-extraction { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .icon-triage { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+        .icon-protection { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+        .icon-documentation { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+        .icon-compliance { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+        .icon-advanced { background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); }
+        .icon-enterprise { background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); }
+        
+        .performance-metric {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        
+        .performance-metric i {
+            margin-right: 0.5rem;
+            color: var(--success-color);
+        }
+        
+        @media (max-width: 768px) {
+            .hero-section {
+                padding: 2rem 0;
+            }
+            
+            .feature-card {
+                margin-bottom: 1.5rem;
+            }
+        }
+    </style>
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i class="bi bi-cpu"></i> Micro-Agent Platform
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('index') }}">
+                            <i class="bi bi-house"></i> Home
+                        </a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="agentsDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-robot"></i> Agent Demos
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('agent_demo', agent_name='business_rule_extraction') }}">Business Rule Extraction</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('agent_demo', agent_name='application_triage') }}">Application Triage</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('agent_demo', agent_name='personal_data_protection') }}">Personal Data Protection</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('agent_demo', agent_name='rule_documentation') }}">Rule Documentation</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('agent_demo', agent_name='compliance_monitoring') }}">Compliance Monitoring</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('agent_demo', agent_name='advanced_documentation') }}">Advanced Documentation</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('agent_demo', agent_name='enterprise_data_privacy') }}">Enterprise Data Privacy</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="https://github.com/jconnelly/micro-agent-development" target="_blank">
+                            <i class="bi bi-github"></i> GitHub
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-light py-4 mt-5">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6>Micro-Agent Development Platform</h6>
+                    <p class="mb-0">Enterprise AI Agent Platform for Business Process Automation</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <p class="mb-0">
+                        <i class="bi bi-shield-check"></i> Enterprise Ready • 
+                        <i class="bi bi-graph-up"></i> Production Tested • 
+                        <i class="bi bi-award"></i> Compliance Ready
+                    </p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Custom JavaScript -->
+    <script>
+        // Global demo functions
+        function showLoading(buttonId) {
+            const button = document.getElementById(buttonId);
+            const spinner = button.querySelector('.loading-spinner');
+            const text = button.querySelector('.button-text');
+            
+            button.disabled = true;
+            spinner.style.display = 'inline-block';
+            text.textContent = 'Processing...';
+        }
+        
+        function hideLoading(buttonId, originalText) {
+            const button = document.getElementById(buttonId);
+            const spinner = button.querySelector('.loading-spinner');
+            const text = button.querySelector('.button-text');
+            
+            button.disabled = false;
+            spinner.style.display = 'none';
+            text.textContent = originalText;
+        }
+        
+        function formatResult(result) {
+            return JSON.stringify(result, null, 2);
+        }
+        
+        function showError(message) {
+            const alertHtml = `
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="bi bi-exclamation-triangle"></i> ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+            
+            const container = document.querySelector('.container');
+            container.insertAdjacentHTML('afterbegin', alertHtml);
+        }
+        
+        function showSuccess(message) {
+            const alertHtml = `
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="bi bi-check-circle"></i> ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+            
+            const container = document.querySelector('.container');
+            container.insertAdjacentHTML('afterbegin', alertHtml);
+        }
+    </script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

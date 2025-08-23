@@ -1,0 +1,566 @@
+{% extends "base.html" %}
+
+{% block title %}{{ agent_info.name }} - Live Demo | Micro-Agent Platform{% endblock %}
+
+{% block content %}
+<!-- Agent Demo Header -->
+<section class="py-5 bg-gradient" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="agent-icon icon-{{ agent_name.replace('_', '-') }} me-3">
+                        {% if agent_name == 'business_rule_extraction' %}
+                            <i class="bi bi-code-slash"></i>
+                        {% elif agent_name == 'application_triage' %}
+                            <i class="bi bi-diagram-3"></i>
+                        {% elif agent_name == 'personal_data_protection' %}
+                            <i class="bi bi-shield-lock"></i>
+                        {% elif agent_name == 'rule_documentation' %}
+                            <i class="bi bi-file-text"></i>
+                        {% elif agent_name == 'compliance_monitoring' %}
+                            <i class="bi bi-clipboard-check"></i>
+                        {% elif agent_name == 'advanced_documentation' %}
+                            <i class="bi bi-gear"></i>
+                        {% elif agent_name == 'enterprise_data_privacy' %}
+                            <i class="bi bi-building"></i>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <h1 class="display-5 fw-bold mb-2">{{ agent_info.name }}</h1>
+                        <p class="lead mb-0">{{ agent_info.description }}</p>
+                    </div>
+                </div>
+                
+                <!-- Performance Metrics -->
+                <div class="row g-3">
+                    {% for key, value in capabilities.items() %}
+                        {% if key in ['performance', 'accuracy'] %}
+                        <div class="col-auto">
+                            <div class="bg-white bg-opacity-20 rounded px-3 py-2">
+                                <div class="fw-bold">{{ value }}</div>
+                                <small>{{ key.title() }}</small>
+                            </div>
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="col-lg-4 text-center">
+                <div class="bg-white bg-opacity-10 rounded-3 p-4">
+                    <h5 class="mb-3">Key Features</h5>
+                    <ul class="list-unstyled text-start">
+                        {% for feature in capabilities.get('key_features', []) %}
+                        <li class="mb-2">
+                            <i class="bi bi-check-circle me-2"></i>{{ feature }}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Demo Interface -->
+<section class="py-5">
+    <div class="container">
+        <div class="row">
+            <!-- Sample Files Selection -->
+            <div class="col-lg-4">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="bi bi-file-earmark-code me-2"></i>Sample Files
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-3">Choose a sample file to see {{ agent_info.name }} in action:</p>
+                        
+                        {% for file in agent_info.files %}
+                        <div class="sample-file-option mb-3 p-3 border rounded cursor-pointer" data-file="{{ file.path }}" data-name="{{ file.name }}">
+                            <div class="d-flex align-items-start">
+                                <i class="bi bi-file-earmark-text text-primary me-3 fs-5"></i>
+                                <div class="flex-grow-1">
+                                    <h6 class="fw-bold mb-1">{{ file.name }}</h6>
+                                    <p class="text-muted mb-2 small">{{ file.description }}</p>
+                                    <span class="badge bg-light text-dark">{{ file.type.upper() }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        
+                        <button id="runDemoBtn" class="btn btn-success w-100 mt-3" disabled>
+                            <span class="loading-spinner spinner-border spinner-border-sm me-2" role="status"></span>
+                            <span class="button-text">
+                                <i class="bi bi-play-circle me-2"></i>Run Demo
+                            </span>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Capabilities Card -->
+                <div class="card border-0 shadow-sm mt-4">
+                    <div class="card-header bg-info text-white">
+                        <h6 class="mb-0">
+                            <i class="bi bi-speedometer2 me-2"></i>Capabilities
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        {% for key, value in capabilities.items() %}
+                            {% if key not in ['key_features'] %}
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="text-muted">{{ key.replace('_', ' ').title() }}:</span>
+                                <span class="fw-bold">
+                                    {% if value is string %}
+                                        {{ value }}
+                                    {% elif value is sequence %}
+                                        {{ value|length }} items
+                                    {% else %}
+                                        {{ value }}
+                                    {% endif %}
+                                </span>
+                            </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Demo Results -->
+            <div class="col-lg-8">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="bi bi-terminal me-2"></i>Live Demo Results
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="demoPlaceholder" class="text-center py-5 text-muted">
+                            <i class="bi bi-arrow-left fs-1 mb-3"></i>
+                            <h5>Select a sample file to begin</h5>
+                            <p>Choose any sample file from the left panel to see {{ agent_info.name }} process it in real-time.</p>
+                        </div>
+                        
+                        <div id="demoResults" class="d-none">
+                            <!-- Input Preview -->
+                            <div class="mb-4">
+                                <h6 class="fw-bold text-primary">
+                                    <i class="bi bi-file-earmark me-2"></i>Input Sample
+                                </h6>
+                                <div class="code-preview" id="inputPreview"></div>
+                            </div>
+                            
+                            <!-- Processing Status -->
+                            <div class="mb-4 d-none" id="processingStatus">
+                                <h6 class="fw-bold text-warning">
+                                    <i class="bi bi-hourglass-split me-2"></i>Processing
+                                </h6>
+                                <div class="progress">
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%"></div>
+                                </div>
+                                <p class="text-muted mt-2">{{ agent_info.name }} is analyzing the sample data...</p>
+                            </div>
+                            
+                            <!-- Output Results -->
+                            <div class="mb-4 d-none" id="outputResults">
+                                <h6 class="fw-bold text-success">
+                                    <i class="bi bi-check-circle me-2"></i>Results
+                                </h6>
+                                <div id="outputContent"></div>
+                            </div>
+                            
+                            <!-- Processing Metrics -->
+                            <div class="d-none" id="processingMetrics">
+                                <h6 class="fw-bold text-info">
+                                    <i class="bi bi-graph-up me-2"></i>Processing Metrics
+                                </h6>
+                                <div class="row" id="metricsContent"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Integration Examples -->
+<section class="py-5 bg-light">
+    <div class="container">
+        <h3 class="fw-bold text-center mb-5">Integration Examples</h3>
+        <div class="row">
+            <div class="col-lg-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <h5 class="fw-bold mb-3">
+                            <i class="bi bi-code-square text-primary me-2"></i>Python Integration
+                        </h5>
+                        <div class="code-preview">
+{% raw %}from Agents.{{ agent_name.split('_')|map('title')|join('')}}Agent import {{ agent_name.split('_')|map('title')|join('')}}Agent
+
+# Initialize the agent
+agent = {{ agent_name.split('_')|map('title')|join('')}}Agent(
+    audit_system=audit_system,
+    model_name="gpt-4"
+)
+
+# Process your data
+result = agent.process_data(
+    input_data=your_data,
+    context="Production processing"
+)
+
+print(f"Results: {result}"){% endraw %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <h5 class="fw-bold mb-3">
+                            <i class="bi bi-cloud text-primary me-2"></i>REST API Integration
+                        </h5>
+                        <div class="code-preview">
+curl -X POST "https://api.yourcompany.com/agents/{{ agent_name }}" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -d '{
+    "input_data": "your_sample_data",
+    "context": "API integration test",
+    "options": {
+      "audit_level": 2,
+      "output_format": "json"
+    }
+  }'
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let selectedFile = null;
+    let selectedFileName = null;
+    
+    // Sample file selection
+    document.querySelectorAll('.sample-file-option').forEach(option => {
+        option.addEventListener('click', function() {
+            // Remove previous selection
+            document.querySelectorAll('.sample-file-option').forEach(opt => {
+                opt.classList.remove('border-primary', 'bg-primary', 'bg-opacity-10');
+            });
+            
+            // Add selection styling
+            this.classList.add('border-primary', 'bg-primary', 'bg-opacity-10');
+            
+            // Store selected file
+            selectedFile = this.dataset.file;
+            selectedFileName = this.dataset.name;
+            
+            // Enable run demo button
+            document.getElementById('runDemoBtn').disabled = false;
+        });
+    });
+    
+    // Run demo button
+    document.getElementById('runDemoBtn').addEventListener('click', function() {
+        if (!selectedFile) {
+            showError('Please select a sample file first');
+            return;
+        }
+        
+        runDemo();
+    });
+    
+    async function runDemo() {
+        try {
+            // Show loading state
+            showLoading('runDemoBtn');
+            
+            // Hide placeholder and show results container
+            document.getElementById('demoPlaceholder').style.display = 'none';
+            document.getElementById('demoResults').classList.remove('d-none');
+            document.getElementById('processingStatus').classList.remove('d-none');
+            
+            // Make API call
+            const response = await fetch(`/api/run_demo/{{ agent_name }}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    sample_file: selectedFile
+                })
+            });
+            
+            const result = await response.json();
+            
+            // Hide processing status
+            document.getElementById('processingStatus').classList.add('d-none');
+            
+            if (result.success) {
+                displayResults(result);
+                showSuccess(`Demo completed successfully in ${result.processing_time || 'unknown'} time`);
+            } else {
+                showError(`Demo failed: ${result.error}`);
+            }
+            
+        } catch (error) {
+            document.getElementById('processingStatus').classList.add('d-none');
+            showError(`Demo failed: ${error.message}`);
+        } finally {
+            hideLoading('runDemoBtn', 'Run Demo');
+        }
+    }
+    
+    function displayResults(result) {
+        // Show input preview
+        document.getElementById('inputPreview').textContent = result.input_preview;
+        
+        // Show output results
+        const outputContainer = document.getElementById('outputContent');
+        const output = result.output;
+        
+        if (output.type === 'error') {
+            outputContainer.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <strong>Processing Error:</strong> ${output.message}
+                </div>
+            `;
+        } else {
+            // Create formatted output based on agent type
+            outputContainer.innerHTML = formatAgentOutput(output);
+        }
+        
+        // Show processing metrics
+        document.getElementById('processingMetrics').classList.remove('d-none');
+        const metricsContainer = document.getElementById('metricsContent');
+        metricsContainer.innerHTML = `
+            <div class="col-md-3">
+                <div class="text-center">
+                    <div class="fs-4 fw-bold text-primary">${result.processing_time || 'N/A'}</div>
+                    <div class="text-muted">Processing Time</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="text-center">
+                    <div class="fs-4 fw-bold text-success">${selectedFileName}</div>
+                    <div class="text-muted">Sample File</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="text-center">
+                    <div class="fs-4 fw-bold text-info">${result.timestamp.split('T')[1].split('.')[0]}</div>
+                    <div class="text-muted">Processed At</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="text-center">
+                    <div class="fs-4 fw-bold text-warning">Live</div>
+                    <div class="text-muted">Demo Mode</div>
+                </div>
+            </div>
+        `;
+        
+        document.getElementById('outputResults').classList.remove('d-none');
+    }
+    
+    function formatAgentOutput(output) {
+        const agentName = '{{ agent_name }}';
+        
+        switch (agentName) {
+            case 'business_rule_extraction':
+                return formatRuleExtractionOutput(output);
+            case 'application_triage':
+                return formatTriageOutput(output);
+            case 'personal_data_protection':
+                return formatPiiProtectionOutput(output);
+            case 'rule_documentation':
+                return formatDocumentationOutput(output);
+            case 'compliance_monitoring':
+                return formatComplianceOutput(output);
+            case 'advanced_documentation':
+                return formatAdvancedDocOutput(output);
+            case 'enterprise_data_privacy':
+                return formatEnterprisePrivacyOutput(output);
+            default:
+                return `<pre class="code-preview">${JSON.stringify(output, null, 2)}</pre>`;
+        }
+    }
+    
+    function formatRuleExtractionOutput(output) {
+        return `
+            <div class="alert alert-success">
+                <h6><i class="bi bi-check-circle me-2"></i>${output.summary}</h6>
+            </div>
+            <h6>Extracted Rules (showing first 5):</h6>
+            <div class="list-group">
+                ${output.rules.map((rule, index) => `
+                    <div class="list-group-item">
+                        <h6 class="mb-1">Rule ${index + 1}</h6>
+                        <p class="mb-1">${rule.description || rule.rule_text || JSON.stringify(rule)}</p>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+    
+    function formatTriageOutput(output) {
+        return `
+            <div class="alert alert-info">
+                <h6><i class="bi bi-diagram-3 me-2"></i>${output.summary}</h6>
+            </div>
+            <h6>Triage Results:</h6>
+            <div class="row">
+                ${output.results.map(result => `
+                    <div class="col-md-6 mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h6 class="card-title">${result.submission_id}</h6>
+                                <p class="mb-1"><strong>Category:</strong> ${result.category}</p>
+                                <p class="mb-1"><strong>Priority:</strong> 
+                                    <span class="badge bg-${result.priority === 'HIGH' ? 'danger' : result.priority === 'MEDIUM' ? 'warning' : 'secondary'}">${result.priority}</span>
+                                </p>
+                                <p class="mb-1"><strong>Routing:</strong> ${result.routing}</p>
+                                <p class="mb-0"><strong>Confidence:</strong> ${(result.confidence * 100).toFixed(1)}%</p>
+                            </div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+    
+    function formatPiiProtectionOutput(output) {
+        return `
+            <div class="alert alert-warning">
+                <h6><i class="bi bi-shield-lock me-2"></i>${output.summary}</h6>
+                <p class="mb-0">PII Types Found: <strong>${output.pii_types.join(', ')}</strong></p>
+            </div>
+            <div class="row">
+                <div class="col-md-6">
+                    <h6>Original (with PII):</h6>
+                    <div class="code-preview small">${output.original_preview}</div>
+                </div>
+                <div class="col-md-6">
+                    <h6>Protected (PII masked):</h6>
+                    <div class="code-preview small">${output.protected_preview}</div>
+                </div>
+            </div>
+            <div class="mt-3">
+                <span class="badge bg-success me-1">GDPR Compliant</span>
+                <span class="badge bg-success me-1">CCPA Compliant</span>
+                <span class="badge bg-success">HIPAA Compliant</span>
+            </div>
+        `;
+    }
+    
+    function formatDocumentationOutput(output) {
+        const doc = output.documentation;
+        return `
+            <div class="alert alert-primary">
+                <h6><i class="bi bi-file-text me-2"></i>${output.summary}</h6>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">${doc.title}</h6>
+                </div>
+                <div class="card-body">
+                    <p><strong>Total Rules:</strong> ${doc.total_rules}</p>
+                    <p><strong>Categories:</strong> ${Object.keys(doc.categories).join(', ')}</p>
+                    <p><strong>Available Formats:</strong> ${doc.formats_available.join(', ')}</p>
+                    <p><strong>Generated:</strong> ${new Date(doc.generated_date).toLocaleString()}</p>
+                </div>
+            </div>
+        `;
+    }
+    
+    function formatComplianceOutput(output) {
+        const report = output.compliance_report;
+        return `
+            <div class="alert alert-info">
+                <h6><i class="bi bi-clipboard-check me-2"></i>${output.summary}</h6>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Compliance Report</h6>
+                </div>
+                <div class="card-body">
+                    <p><strong>Audit ID:</strong> ${report.audit_id}</p>
+                    <p><strong>Risk Assessment:</strong> 
+                        <span class="badge bg-${report.risk_assessment === 'LOW' ? 'success' : 'warning'}">${report.risk_assessment}</span>
+                    </p>
+                    <p><strong>Frameworks:</strong> ${report.compliance_frameworks.join(', ')}</p>
+                    <p><strong>Data Processed:</strong> ${report.data_processed}</p>
+                    <p><strong>Encryption:</strong> ${report.encryption_status}</p>
+                </div>
+            </div>
+        `;
+    }
+    
+    function formatAdvancedDocOutput(output) {
+        const analysis = output.analysis;
+        return `
+            <div class="alert alert-success">
+                <h6><i class="bi bi-gear me-2"></i>${output.summary}</h6>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Document Analysis</h6>
+                </div>
+                <div class="card-body">
+                    <p><strong>Document Type:</strong> ${analysis.document_type}</p>
+                    <p><strong>Complexity Score:</strong> ${analysis.complexity_score.toFixed(1)}/10</p>
+                    <p><strong>Sections:</strong> ${analysis.sections_identified.join(', ')}</p>
+                    <p><strong>Tool Integration:</strong> ${analysis.tool_integration}</p>
+                    <p><strong>Version Control:</strong> ${analysis.version_control}</p>
+                </div>
+            </div>
+        `;
+    }
+    
+    function formatEnterprisePrivacyOutput(output) {
+        const report = output.enterprise_report;
+        return `
+            <div class="alert alert-warning">
+                <h6><i class="bi bi-building me-2"></i>${output.summary}</h6>
+            </div>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">Privacy Analysis</h6>
+                        </div>
+                        <div class="card-body">
+                            <p><strong>Risk Level:</strong> 
+                                <span class="badge bg-warning">${output.privacy_analysis.risk_level}</span>
+                            </p>
+                            <p><strong>Tokenization:</strong> ${output.privacy_analysis.tokenization_applied ? 'Applied' : 'Not Applied'}</p>
+                            <p><strong>Encryption:</strong> ${output.privacy_analysis.encryption_method}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">Performance</h6>
+                        </div>
+                        <div class="card-body">
+                            <p><strong>Processing Speed:</strong> ${report.performance_metrics.processing_speed}</p>
+                            <p><strong>Memory Efficiency:</strong> ${report.performance_metrics.memory_efficiency}</p>
+                            <p><strong>Scalability:</strong> ${report.performance_metrics.scalability}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+</script>
+{% endblock %}

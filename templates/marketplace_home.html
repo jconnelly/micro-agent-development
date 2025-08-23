@@ -1,0 +1,510 @@
+{% extends "base.html" %}
+
+{% block title %}Micro-Agent Development Platform - Marketplace Demo{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero-section">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <h1 class="display-4 fw-bold mb-4">
+                    Enterprise AI Agent Platform
+                    <span class="d-block text-warning">Live Marketplace Demo</span>
+                </h1>
+                <p class="lead mb-4">
+                    Experience our 7 specialized AI agents designed for enterprise business process automation. 
+                    Test with real sample data and see immediate results.
+                </p>
+                <div class="d-flex flex-wrap gap-3 mb-4">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-shield-check text-success me-2"></i>
+                        <span>GDPR/HIPAA Compliant</span>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-speedometer2 text-warning me-2"></i>
+                        <span>Production Ready</span>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-graph-up text-info me-2"></i>
+                        <span>Enterprise Scale</span>
+                    </div>
+                </div>
+                <a href="#agents-showcase" class="btn btn-light btn-lg">
+                    <i class="bi bi-play-circle"></i> Try Live Demos
+                </a>
+            </div>
+            <div class="col-lg-4 text-center">
+                <div class="bg-white bg-opacity-10 rounded-3 p-4">
+                    <h4 class="text-warning mb-3">Platform Metrics</h4>
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <h3 class="fw-bold">1M+</h3>
+                            <small>Records/Min</small>
+                        </div>
+                        <div class="col-6">
+                            <h3 class="fw-bold">99.9%</h3>
+                            <small>Accuracy</small>
+                        </div>
+                        <div class="col-6 mt-3">
+                            <h3 class="fw-bold">7</h3>
+                            <small>AI Agents</small>
+                        </div>
+                        <div class="col-6 mt-3">
+                            <h3 class="fw-bold">24/7</h3>
+                            <small>Enterprise Support</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Agents Showcase -->
+<section id="agents-showcase" class="py-5">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h2 class="fw-bold">Interactive Agent Demonstrations</h2>
+            <p class="lead text-muted">Click on any agent to see live demonstrations with sample data</p>
+        </div>
+        
+        <div class="row g-4">
+            <!-- Business Rule Extraction Agent -->
+            <div class="col-lg-4 col-md-6">
+                <div class="card feature-card h-100">
+                    <div class="card-body">
+                        <div class="agent-icon icon-extraction">
+                            <i class="bi bi-code-slash"></i>
+                        </div>
+                        <h5 class="card-title fw-bold">Business Rule Extraction</h5>
+                        <p class="card-text text-muted">
+                            Extract and translate business rules from legacy COBOL, Java, and C++ systems. 
+                            Accelerate modernization projects by 60-80%.
+                        </p>
+                        
+                        {% if capabilities['business_rule_extraction'] %}
+                        <div class="mb-3">
+                            <div class="performance-metric">
+                                <i class="bi bi-speedometer2"></i>
+                                <span>{{ capabilities['business_rule_extraction']['performance'] }}</span>
+                            </div>
+                            <div class="performance-metric">
+                                <i class="bi bi-code-square"></i>
+                                <span>{{ capabilities['business_rule_extraction']['languages']|length }} Languages Supported</span>
+                            </div>
+                            <div class="performance-metric">
+                                <i class="bi bi-bullseye"></i>
+                                <span>{{ capabilities['business_rule_extraction']['accuracy'] }} Accuracy</span>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="mb-3">
+                            <span class="badge badge-performance me-1">Legacy Modernization</span>
+                            <span class="badge badge-capability me-1">COBOL • Java • C++</span>
+                        </div>
+                        
+                        <a href="{{ url_for('agent_demo', agent_name='business_rule_extraction') }}" class="btn btn-demo text-white w-100">
+                            <i class="bi bi-play-circle"></i> Try Live Demo
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Application Triage Agent -->
+            <div class="col-lg-4 col-md-6">
+                <div class="card feature-card h-100">
+                    <div class="card-body">
+                        <div class="agent-icon icon-triage">
+                            <i class="bi bi-diagram-3"></i>
+                        </div>
+                        <h5 class="card-title fw-bold">Application Triage</h5>
+                        <p class="card-text text-muted">
+                            Intelligent document processing and routing with smart categorization. 
+                            Sub-second response time with 99.5% accuracy.
+                        </p>
+                        
+                        {% if capabilities['application_triage'] %}
+                        <div class="mb-3">
+                            <div class="performance-metric">
+                                <i class="bi bi-lightning"></i>
+                                <span>{{ capabilities['application_triage']['performance'] }}</span>
+                            </div>
+                            <div class="performance-metric">
+                                <i class="bi bi-file-earmark"></i>
+                                <span>{{ capabilities['application_triage']['formats']|length }} Formats Supported</span>
+                            </div>
+                            <div class="performance-metric">
+                                <i class="bi bi-bullseye"></i>
+                                <span>{{ capabilities['application_triage']['accuracy'] }} Accuracy</span>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="mb-3">
+                            <span class="badge badge-performance me-1">Smart Routing</span>
+                            <span class="badge badge-capability me-1">Multi-Format</span>
+                        </div>
+                        
+                        <a href="{{ url_for('agent_demo', agent_name='application_triage') }}" class="btn btn-demo text-white w-100">
+                            <i class="bi bi-play-circle"></i> Try Live Demo
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Personal Data Protection Agent -->
+            <div class="col-lg-4 col-md-6">
+                <div class="card feature-card h-100">
+                    <div class="card-body">
+                        <div class="agent-icon icon-protection">
+                            <i class="bi bi-shield-lock"></i>
+                        </div>
+                        <h5 class="card-title fw-bold">Personal Data Protection</h5>
+                        <p class="card-text text-muted">
+                            GDPR/CCPA compliant PII detection and protection. Process 1M+ records per minute 
+                            with 17 PII types detected.
+                        </p>
+                        
+                        {% if capabilities['personal_data_protection'] %}
+                        <div class="mb-3">
+                            <div class="performance-metric">
+                                <i class="bi bi-speedometer2"></i>
+                                <span>{{ capabilities['personal_data_protection']['performance'] }}</span>
+                            </div>
+                            <div class="performance-metric">
+                                <i class="bi bi-eye-slash"></i>
+                                <span>{{ capabilities['personal_data_protection']['pii_types'] }}</span>
+                            </div>
+                            <div class="performance-metric">
+                                <i class="bi bi-shield-check"></i>
+                                <span>{{ capabilities['personal_data_protection']['compliance']|length }} Compliance Standards</span>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="mb-3">
+                            <span class="badge badge-performance me-1">GDPR Compliant</span>
+                            <span class="badge badge-capability me-1">SecureTokenStorage</span>
+                        </div>
+                        
+                        <a href="{{ url_for('agent_demo', agent_name='personal_data_protection') }}" class="btn btn-demo text-white w-100">
+                            <i class="bi bi-play-circle"></i> Try Live Demo
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rule Documentation Generator -->
+            <div class="col-lg-4 col-md-6">
+                <div class="card feature-card h-100">
+                    <div class="card-body">
+                        <div class="agent-icon icon-documentation">
+                            <i class="bi bi-file-text"></i>
+                        </div>
+                        <h5 class="card-title fw-bold">Rule Documentation Generator</h5>
+                        <p class="card-text text-muted">
+                            Automated business documentation with multi-format output. Generate 50+ rule sets 
+                            per minute with domain classification.
+                        </p>
+                        
+                        {% if capabilities['rule_documentation'] %}
+                        <div class="mb-3">
+                            <div class="performance-metric">
+                                <i class="bi bi-speedometer2"></i>
+                                <span>{{ capabilities['rule_documentation']['performance'] }}</span>
+                            </div>
+                            <div class="performance-metric">
+                                <i class="bi bi-file-earmark-text"></i>
+                                <span>{{ capabilities['rule_documentation']['formats']|length }} Output Formats</span>
+                            </div>
+                            <div class="performance-metric">
+                                <i class="bi bi-tags"></i>
+                                <span>{{ capabilities['rule_documentation']['domains'] }}</span>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="mb-3">
+                            <span class="badge badge-performance me-1">Multi-Format</span>
+                            <span class="badge badge-capability me-1">Auto-Classification</span>
+                        </div>
+                        
+                        <a href="{{ url_for('agent_demo', agent_name='rule_documentation') }}" class="btn btn-demo text-white w-100">
+                            <i class="bi bi-play-circle"></i> Try Live Demo
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Compliance Monitoring Agent -->
+            <div class="col-lg-4 col-md-6">
+                <div class="card feature-card h-100">
+                    <div class="card-body">
+                        <div class="agent-icon icon-compliance">
+                            <i class="bi bi-clipboard-check"></i>
+                        </div>
+                        <h5 class="card-title fw-bold">Compliance Monitoring</h5>
+                        <p class="card-text text-muted">
+                            SOX, GDPR, HIPAA, and SOC 2 compliance with real-time audit trail management 
+                            and regulatory reporting.
+                        </p>
+                        
+                        {% if capabilities['compliance_monitoring'] %}
+                        <div class="mb-3">
+                            <div class="performance-metric">
+                                <i class="bi bi-clock"></i>
+                                <span>{{ capabilities['compliance_monitoring']['performance'] }}</span>
+                            </div>
+                            <div class="performance-metric">
+                                <i class="bi bi-shield-check"></i>
+                                <span>{{ capabilities['compliance_monitoring']['frameworks']|length }} Frameworks</span>
+                            </div>
+                            <div class="performance-metric">
+                                <i class="bi bi-list-ol"></i>
+                                <span>{{ capabilities['compliance_monitoring']['audit_levels'] }}</span>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="mb-3">
+                            <span class="badge badge-performance me-1">SOX • GDPR • HIPAA</span>
+                            <span class="badge badge-capability me-1">Real-time</span>
+                        </div>
+                        
+                        <a href="{{ url_for('agent_demo', agent_name='compliance_monitoring') }}" class="btn btn-demo text-white w-100">
+                            <i class="bi bi-play-circle"></i> Try Live Demo
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Advanced Documentation Agent -->
+            <div class="col-lg-4 col-md-6">
+                <div class="card feature-card h-100">
+                    <div class="card-body">
+                        <div class="agent-icon icon-advanced">
+                            <i class="bi bi-gear"></i>
+                        </div>
+                        <h5 class="card-title fw-bold">Advanced Documentation</h5>
+                        <p class="card-text text-muted">
+                            Enterprise documentation with tool integration and atomic operations. 
+                            Claude Code compatible with version control.
+                        </p>
+                        
+                        {% if capabilities['advanced_documentation'] %}
+                        <div class="mb-3">
+                            <div class="performance-metric">
+                                <i class="bi bi-cpu"></i>
+                                <span>{{ capabilities['advanced_documentation']['performance'] }}</span>
+                            </div>
+                            <div class="performance-metric">
+                                <i class="bi bi-puzzle"></i>
+                                <span>{{ capabilities['advanced_documentation']['integration'] }}</span>
+                            </div>
+                            <div class="performance-metric">
+                                <i class="bi bi-file-earmark-code"></i>
+                                <span>{{ capabilities['advanced_documentation']['output'] }}</span>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="mb-3">
+                            <span class="badge badge-performance me-1">Tool Integration</span>
+                            <span class="badge badge-capability me-1">Enterprise</span>
+                        </div>
+                        
+                        <a href="{{ url_for('agent_demo', agent_name='advanced_documentation') }}" class="btn btn-demo text-white w-100">
+                            <i class="bi bi-play-circle"></i> Try Live Demo
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Enterprise Data Privacy Agent -->
+            <div class="col-lg-4 col-md-6">
+                <div class="card feature-card h-100">
+                    <div class="card-body">
+                        <div class="agent-icon icon-enterprise">
+                            <i class="bi bi-building"></i>
+                        </div>
+                        <h5 class="card-title fw-bold">Enterprise Data Privacy</h5>
+                        <p class="card-text text-muted">
+                            High-performance PII processing for large documents. Handle 100GB+ per hour 
+                            with unlimited document size support.
+                        </p>
+                        
+                        {% if capabilities['enterprise_data_privacy'] %}
+                        <div class="mb-3">
+                            <div class="performance-metric">
+                                <i class="bi bi-speedometer2"></i>
+                                <span>{{ capabilities['enterprise_data_privacy']['performance'] }}</span>
+                            </div>
+                            <div class="performance-metric">
+                                <i class="bi bi-arrows-expand"></i>
+                                <span>{{ capabilities['enterprise_data_privacy']['scalability'] }}</span>
+                            </div>
+                            <div class="performance-metric">
+                                <i class="bi bi-infinity"></i>
+                                <span>{{ capabilities['enterprise_data_privacy']['capacity'] }}</span>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="mb-3">
+                            <span class="badge badge-performance me-1">100GB+/hour</span>
+                            <span class="badge badge-capability me-1">Streaming</span>
+                        </div>
+                        
+                        <a href="{{ url_for('agent_demo', agent_name='enterprise_data_privacy') }}" class="btn btn-demo text-white w-100">
+                            <i class="bi bi-play-circle"></i> Try Live Demo
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Quick Start Section -->
+<section class="py-5 bg-white">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-6">
+                <h3 class="fw-bold mb-3">Ready to Get Started?</h3>
+                <p class="lead text-muted mb-4">
+                    Choose your integration path based on your role and requirements. 
+                    All agents are production-ready and enterprise-tested.
+                </p>
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="d-flex align-items-start">
+                            <i class="bi bi-people text-primary me-3 fs-4"></i>
+                            <div>
+                                <h6 class="fw-bold">Business Users</h6>
+                                <p class="text-muted mb-0">Quick setup for business teams and analysts</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="d-flex align-items-start">
+                            <i class="bi bi-code text-primary me-3 fs-4"></i>
+                            <div>
+                                <h6 class="fw-bold">Technical Users</h6>
+                                <p class="text-muted mb-0">API integration and development resources</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="d-flex align-items-start">
+                            <i class="bi bi-building text-primary me-3 fs-4"></i>
+                            <div>
+                                <h6 class="fw-bold">Enterprise Users</h6>
+                                <p class="text-muted mb-0">High-volume deployment and optimization</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="d-flex align-items-start">
+                            <i class="bi bi-shield-check text-primary me-3 fs-4"></i>
+                            <div>
+                                <h6 class="fw-bold">Compliance Teams</h6>
+                                <p class="text-muted mb-0">GDPR, HIPAA, SOX compliance ready</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="bg-light rounded-3 p-4">
+                    <h5 class="fw-bold mb-3">Enterprise Features</h5>
+                    <ul class="list-unstyled">
+                        <li class="mb-2">
+                            <i class="bi bi-check-circle text-success me-2"></i>
+                            BYO-LLM Support (OpenAI, Claude, Gemini, Azure)
+                        </li>
+                        <li class="mb-2">
+                            <i class="bi bi-check-circle text-success me-2"></i>
+                            High-Performance Processing (1M+ records/min)
+                        </li>
+                        <li class="mb-2">
+                            <i class="bi bi-check-circle text-success me-2"></i>
+                            Enterprise Security & Compliance
+                        </li>
+                        <li class="mb-2">
+                            <i class="bi bi-check-circle text-success me-2"></i>
+                            RESTful APIs for System Integration
+                        </li>
+                        <li class="mb-2">
+                            <i class="bi bi-check-circle text-success me-2"></i>
+                            Multi-Format Output (Markdown, HTML, PDF, JSON)
+                        </li>
+                        <li class="mb-0">
+                            <i class="bi bi-check-circle text-success me-2"></i>
+                            24/7 Enterprise Support Available
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Add smooth scrolling for anchor links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const target = document.querySelector(this.getAttribute('href'));
+            if (target) {
+                target.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }
+        });
+    });
+    
+    // Add animation to feature cards when they come into view
+    const observerOptions = {
+        threshold: 0.1,
+        rootMargin: '0px 0px -50px 0px'
+    };
+    
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.style.animation = 'fadeInUp 0.6s ease forwards';
+            }
+        });
+    }, observerOptions);
+    
+    document.querySelectorAll('.feature-card').forEach(card => {
+        observer.observe(card);
+    });
+    
+    // Add fadeInUp animation
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .feature-card {
+            opacity: 0;
+        }
+    `;
+    document.head.appendChild(style);
+</script>
+{% endblock %}
