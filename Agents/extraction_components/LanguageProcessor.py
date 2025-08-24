@@ -52,7 +52,17 @@ class LanguageProcessor:
             detection_result = self.language_detector.detect_language(content, filename)
             
             # Get language-specific chunking parameters
-            chunking_params = self.language_detector.get_chunking_params(detection_result.language)
+            # Fallback for missing method - provide default chunking parameters
+            if hasattr(self.language_detector, 'get_chunking_params'):
+                chunking_params = self.language_detector.get_chunking_params(detection_result.language)
+            else:
+                # Default chunking parameters for all languages
+                chunking_params = {
+                    'preferred_size': 175,
+                    'max_size': 300,
+                    'overlap_lines': 20,
+                    'language_specific': detection_result.language.lower() if detection_result.language else 'unknown'
+                }
             
             detection_time = time.time() - start_time
             

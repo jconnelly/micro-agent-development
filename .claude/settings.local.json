@@ -17,7 +17,15 @@
       "Bash(mkdir:*)",
       "Bash(del test_config_extraction.py)",
       "Bash(dir test_*.py)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(move \"*test*.jsonl\" test_outputs/)",
+      "Bash(move \"*test*.json\" test_outputs/)",
+      "Bash(move \"*debug*.jsonl\" test_outputs/)",
+      "Bash(move \"*verification*.jsonl\" test_outputs/)",
+      "Bash(move \"*verification*.json\" test_outputs/)",
+      "Bash(move \"*working*.jsonl\" test_outputs/)",
+      "Bash(move \"*working*.json\" test_outputs/)",
+      "Bash(curl:*)"
     ],
     "deny": []
   }

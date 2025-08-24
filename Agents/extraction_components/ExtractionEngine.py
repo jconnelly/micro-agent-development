@@ -31,7 +31,8 @@ class ExtractionEngine:
         
         # Load configuration
         model_config = self.agent_config.get('model_defaults', {})
-        self._max_tokens = model_config.get('max_input_tokens', 8192)
+        self._max_output_tokens = model_config.get('max_output_tokens', 4096)
+        self._max_input_tokens = model_config.get('max_input_tokens', 8192)
         self._temperature = model_config.get('temperature', 0.1)
         self._max_retries = self.agent_config.get('api_settings', {}).get('max_retries', 3)
         self._timeout = self.agent_config.get('api_settings', {}).get('timeout_seconds', 30)
@@ -222,17 +223,8 @@ Output format: JSON array with structured business rules containing:
         
         for attempt in range(self._max_retries):
             try:
-                # Use the configured LLM client
-                if hasattr(self, '_call_llm'):
-                    response = self._call_llm(
-                        prompt=prompt,
-                        temperature=self._temperature,
-                        max_tokens=self._max_tokens
-                    )
-                else:
-                    # Fallback to basic client call
-                    response = self._make_basic_llm_call(prompt)
-                
+                # Always use basic LLM call implementation
+                response = self._make_basic_llm_call(prompt)
                 return response
                 
             except Exception as e:
@@ -254,17 +246,50 @@ Output format: JSON array with structured business rules containing:
         )
     
     def _make_basic_llm_call(self, prompt: str) -> Dict[str, Any]:
-        """Basic LLM call implementation (fallback)."""
+        """Basic LLM call implementation supporting OpenAI and Gemini clients."""
         if not self.llm_client:
             raise ValueError("No LLM client configured")
         
-        # This would be implemented based on the specific LLM client
-        # For now, return a mock response
-        return {
-            'response_text': '[]',  # Empty rules array
-            'tokens_input': 0,
-            'tokens_output': 0
-        }
+        try:
+            # Detect client type and make appropriate API call
+            client_type = type(self.llm_client).__name__
+            
+            if hasattr(self.llm_client, 'chat') and hasattr(self.llm_client.chat, 'completions'):
+                # OpenAI client
+                response = self.llm_client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {"role": "system", "content": "You are an expert business rule extraction agent."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    max_tokens=self._max_output_tokens,
+                    temperature=self._temperature
+                )
+                
+                return {
+                    'response_text': response.choices[0].message.content,
+                    'tokens_input': response.usage.prompt_tokens if response.usage else 0,
+                    'tokens_output': response.usage.completion_tokens if response.usage else 0
+                }
+            
+            elif hasattr(self.llm_client, 'generate_content'):
+                # Gemini client
+                response = self.llm_client.generate_content(prompt)
+                
+                return {
+                    'response_text': response.text if response.text else '',
+                    'tokens_input': getattr(response, 'prompt_token_count', 0),
+                    'tokens_output': getattr(response, 'candidates_token_count', 0)
+                }
+            
+            else:
+                # Unknown client type - try generic approach
+                raise ValueError(f"Unsupported LLM client type: {client_type}")
+                
+        except Exception as e:
+            # Log the error and re-raise with context
+            error_msg = f"LLM API call failed with {type(self.llm_client).__name__}: {str(e)}"
+            raise RuntimeError(error_msg) from e
     
     def _parse_llm_response(self, response: Dict[str, Any]) -> List[Dict]:
         """Parse and validate LLM response."""

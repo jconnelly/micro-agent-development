@@ -96,9 +96,12 @@ class BusinessRuleExtractionAgent(BaseAgent):
         """
         Initialize the modularized Business Rule Extraction Agent.
         
+        **BYO-LLM Design Pattern**: If no LLM client is provided, automatically creates
+        a default OpenAI client using environment variables for seamless operation.
+        
         Args:
             audit_system: ComplianceMonitoringAgent for audit trail
-            llm_client: LLM client for rule extraction
+            llm_client: LLM client for rule extraction (auto-created if None)
             agent_id: Unique identifier for this agent instance
             tools: Dictionary of available tools (Write, Read, Grep)
         """
@@ -113,15 +116,15 @@ class BusinessRuleExtractionAgent(BaseAgent):
             audit_system=audit_system
         )
         
-        # Store LLM client and tools
-        self.llm_client = llm_client
+        # BYO-LLM Pattern: Auto-create LLM client if none provided
+        self.llm_client = self._initialize_llm_client(llm_client)
         self.tools = tools or {}
         
         # Initialize modular components (Phase 16 Architecture)
         self.language_processor = LanguageProcessor(self.agent_config)
         self.chunk_processor = ChunkProcessor(self.agent_config)
         self.rule_validator = RuleValidator(self.agent_config)
-        self.extraction_engine = ExtractionEngine(self.agent_config, llm_client)
+        self.extraction_engine = ExtractionEngine(self.agent_config, self.llm_client)
         
         # Performance tracking
         self._processing_stats = {
@@ -145,14 +148,16 @@ class BusinessRuleExtractionAgent(BaseAgent):
             self._concurrent_processing_enabled = False
         
         # Audit initial setup
-        self.audit_system.log_agent_action(
+        self.audit_system.log_agent_activity(
             agent_id=self.agent_id,
             action="agent_initialization",
             details={
                 "agent_type": "BusinessRuleExtractionAgent",
                 "modular_architecture": "Phase 16 Optimized",
                 "components": ["LanguageProcessor", "ChunkProcessor", "RuleValidator", "ExtractionEngine"],
-                "performance_mode": "optimized"
+                "performance_mode": "optimized",
+                "llm_client_type": type(self.llm_client).__name__ if self.llm_client else "None",
+                "byo_llm_pattern": "enabled"
             },
             audit_level=AuditLevel.LEVEL_3.value
         )
@@ -188,7 +193,7 @@ class BusinessRuleExtractionAgent(BaseAgent):
         
         try:
             # Audit the extraction request
-            self.audit_system.log_agent_action(
+            self.audit_system.log_agent_activity(
                 agent_id=self.agent_id,
                 action="rule_extraction_start",
                 details={
@@ -250,7 +255,7 @@ class BusinessRuleExtractionAgent(BaseAgent):
             )
             
             # Audit successful completion
-            self.audit_system.log_agent_action(
+            self.audit_system.log_agent_activity(
                 agent_id=self.agent_id,
                 action="rule_extraction_complete",
                 details={
@@ -284,7 +289,7 @@ class BusinessRuleExtractionAgent(BaseAgent):
             self.logger.error(str(extraction_error))
             
             # Audit the error
-            self.audit_system.log_agent_action(
+            self.audit_system.log_agent_activity(
                 agent_id=self.agent_id,
                 action="rule_extraction_error",
                 details=extraction_error.to_dict(),
@@ -396,7 +401,7 @@ class BusinessRuleExtractionAgent(BaseAgent):
     
     def _log_chunk_error(self, chunk_idx: int, error: Exception, request_id: str) -> None:
         """Log chunk processing errors."""
-        self.audit_system.log_agent_action(
+        self.audit_system.log_agent_activity(
             agent_id=self.agent_id,
             action="chunk_processing_error",
             details={
@@ -412,13 +417,73 @@ class BusinessRuleExtractionAgent(BaseAgent):
         """Get the last completeness analysis report from RuleValidator."""
         return self.rule_validator.get_last_completeness_report()
     
+    def _initialize_llm_client(self, provided_client: Any) -> Any:
+        """
+        Initialize LLM client using BYO-LLM pattern.
+        
+        If no client is provided, automatically create a default OpenAI client
+        using environment variables.
+        
+        Args:
+            provided_client: LLM client provided by user (None to auto-create)
+            
+        Returns:
+            Configured LLM client or None if unavailable
+        """
+        if provided_client is not None:
+            return provided_client
+        
+        # BYO-LLM Pattern: Auto-create OpenAI client
+        try:
+            import os
+            
+            # Try to load environment variables if available
+            try:
+                from dotenv import load_dotenv
+                load_dotenv()
+            except ImportError:
+                pass  # dotenv not required
+            
+            # Check for OpenAI API key
+            openai_key = os.getenv('OPENAI_API_KEY')
+            if openai_key:
+                try:
+                    import openai
+                    client = openai.OpenAI(api_key=openai_key)
+                    self.logger.info("BYO-LLM: Auto-created OpenAI client successfully")
+                    return client
+                except Exception as e:
+                    self.logger.warning(f"BYO-LLM: Failed to create OpenAI client: {e}")
+            
+            # Check for Gemini API key as fallback
+            gemini_key = os.getenv('GEMINI_API_KEY')
+            if gemini_key:
+                try:
+                    import google.generativeai as genai
+                    genai.configure(api_key=gemini_key)
+                    client = genai.GenerativeModel('gemini-1.5-flash')
+                    self.logger.info("BYO-LLM: Auto-created Gemini client successfully")
+                    return client
+                except Exception as e:
+                    self.logger.warning(f"BYO-LLM: Failed to create Gemini client: {e}")
+            
+            # No API keys available
+            self.logger.warning("BYO-LLM: No API keys found (OPENAI_API_KEY, GEMINI_API_KEY). Pattern analysis will be used.")
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"BYO-LLM: Unexpected error during client initialization: {e}")
+            return None
+    
     def get_processing_statistics(self) -> Dict[str, Any]:
         """Get performance statistics for the modular agent."""
         return {
             **self._processing_stats,
             'architecture': 'modular_phase16',
             'components_active': ['LanguageProcessor', 'ChunkProcessor', 'RuleValidator', 'ExtractionEngine'],
-            'performance_optimized': True
+            'performance_optimized': True,
+            'llm_client_status': 'configured' if self.llm_client else 'unavailable',
+            'byo_llm_pattern': 'enabled'
         }
     
     def get_agent_info(self) -> Dict[str, Any]:
@@ -620,7 +685,7 @@ class BusinessRuleExtractionAgent(BaseAgent):
                 )
             
             # Audit the concurrent operation
-            self.audit_system.log_agent_action(
+            self.audit_system.log_agent_activity(
                 agent_id=self.agent_id,
                 action="concurrent_rule_extraction",
                 details={

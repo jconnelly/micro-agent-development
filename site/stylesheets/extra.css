@@ -1,0 +1,197 @@
+/* Custom styles for Micro-Agent Development Platform Documentation */
+
+/* Enhanced code blocks */
+.highlight {
+    border-radius: 6px;
+    margin: 1rem 0;
+}
+
+/* API documentation styling */
+.doc-heading {
+    border-bottom: 2px solid var(--md-primary-fg-color);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+/* Enhanced tables */
+.md-typeset__table {
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Badge styling for status indicators */
+.status-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.status-completed {
+    background: var(--md-success-fg-color);
+    color: white;
+}
+
+.status-in-progress {
+    background: var(--md-warning-fg-color);
+    color: white;
+}
+
+.status-pending {
+    background: var(--md-default-fg-color--lighter);
+    color: var(--md-default-fg-color);
+}
+
+/* Performance metrics styling */
+.perf-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+.perf-metric {
+    background: var(--md-code-bg-color);
+    border: 1px solid var(--md-code-fg-color--light);
+    border-radius: 6px;
+    padding: 1rem;
+    text-align: center;
+}
+
+.perf-metric-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--md-primary-fg-color);
+}
+
+.perf-metric-label {
+    font-size: 0.875rem;
+    color: var(--md-default-fg-color--light);
+    margin-top: 0.25rem;
+}
+
+/* Agent comparison table enhancements */
+.agent-comparison {
+    background: linear-gradient(135deg, var(--md-code-bg-color) 0%, var(--md-default-bg-color) 100%);
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 1rem 0;
+}
+
+/* Architecture diagram container */
+.architecture-diagram {
+    background: var(--md-code-bg-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin: 2rem 0;
+    text-align: center;
+}
+
+/* Enterprise features highlighting */
+.enterprise-feature {
+    border-left: 4px solid var(--md-primary-fg-color);
+    background: var(--md-code-bg-color);
+    padding: 1rem 1.5rem;
+    margin: 1rem 0;
+    border-radius: 0 6px 6px 0;
+}
+
+.enterprise-feature h4 {
+    color: var(--md-primary-fg-color);
+    margin-top: 0;
+}
+
+/* Enhanced admonitions for specific agent types */
+.md-typeset .admonition.agent-info {
+    border-color: var(--md-primary-fg-color);
+}
+
+.md-typeset .admonition.agent-info > .admonition-title {
+    background: var(--md-primary-fg-color);
+    color: white;
+}
+
+/* API reference enhancements */
+.api-section {
+    border: 1px solid var(--md-default-fg-color--lightest);
+    border-radius: 6px;
+    margin: 1rem 0;
+    overflow: hidden;
+}
+
+.api-section-header {
+    background: var(--md-code-bg-color);
+    padding: 1rem;
+    border-bottom: 1px solid var(--md-default-fg-color--lightest);
+}
+
+.api-section-content {
+    padding: 1rem;
+}
+
+/* Code example enhancements */
+.code-example {
+    position: relative;
+}
+
+.code-example-title {
+    position: absolute;
+    top: 0.5rem;
+    right: 1rem;
+    background: var(--md-primary-fg-color);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* Industry use case styling */
+.use-case-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin: 2rem 0;
+}
+
+.use-case-card {
+    border: 1px solid var(--md-default-fg-color--lightest);
+    border-radius: 8px;
+    padding: 1.5rem;
+    background: var(--md-default-bg-color);
+    transition: box-shadow 0.2s ease-in-out;
+}
+
+.use-case-card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.use-case-title {
+    color: var(--md-primary-fg-color);
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+/* Navigation breadcrumbs enhancement */
+.md-nav__title {
+    font-weight: 600;
+}
+
+/* Footer customization */
+.md-footer {
+    background: linear-gradient(135deg, var(--md-primary-fg-color) 0%, var(--md-accent-fg-color) 100%);
+}
+
+/* Responsive design improvements */
+@media screen and (max-width: 768px) {
+    .perf-metrics {
+        grid-template-columns: 1fr;
+    }
+    
+    .use-case-grid {
+        grid-template-columns: 1fr;
+    }
+}
